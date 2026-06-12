@@ -44,20 +44,20 @@ check_new_messages() {
     fi
 
     ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    if python3 -c "
+    if python3 -c '
 import json, sys
 msg = json.load(open(sys.argv[1]))
 notif = {
-    'timestamp': sys.argv[2],
-    'msg_id': msg['id'],
-    'from': msg['from'],
-    'to': msg['to'],
-    'type': msg['type'],
-    'priority': msg['priority'],
-    'notified_agent': sys.argv[3]
+    "timestamp": sys.argv[2],
+    "msg_id": msg["id"],
+    "from": msg["from"],
+    "to": msg["to"],
+    "type": msg["type"],
+    "priority": msg["priority"],
+    "notified_agent": sys.argv[3]
 }
 print(json.dumps(notif))
-" "$f" "$ts" "$agent" >> "$NOTIFICATIONS" 2>/dev/null; then
+' "$f" "$ts" "$agent" >> "$NOTIFICATIONS" 2>/dev/null; then
       log "Notified $agent about $msg_id"
     else
       log "WARN: unreadable message $f"

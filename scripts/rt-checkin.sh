@@ -30,11 +30,11 @@ AGENTS=$(python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1])
 for agent in $AGENTS; do
   STATUS_FILE="$ROUND_TABLE_DIR/status/${agent}.json"
   if [[ -f "$STATUS_FILE" ]]; then
-    python3 -c "
+    python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-print('  {:12s} | {:10s} | {}'.format(d['agent'], d['status'], d.get('current_task', '')[:50]))
-" "$STATUS_FILE"
+print("  {:12s} | {:10s} | {}".format(d["agent"], d["status"], d.get("current_task", "")[:50]))
+' "$STATUS_FILE"
   else
     echo "  $agent: no status card"
   fi
@@ -46,12 +46,12 @@ if [[ $PENDING -gt 0 ]]; then
   echo "--- Urgent Messages ---"
   for f in "$INBOX_DIR"/*.json; do
     [[ ! -f "$f" ]] && continue
-    python3 -c "
+    python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-if d['priority'] in ('urgent', 'high'):
-    print('  [{}] {} -> {} | {}: {}'.format(d['priority'], d['from'], d['to'], d['type'], str(d.get('payload', {}))[:80]))
-" "$f" 2>/dev/null
+if d["priority"] in ("urgent", "high"):
+    print("  [{}] {} -> {} | {}: {}".format(d["priority"], d["from"], d["to"], d["type"], str(d.get("payload", {}))[:80]))
+' "$f" 2>/dev/null
   done
 fi
 

@@ -33,11 +33,11 @@ if [[ -d "$INBOX_DIR" ]]; then
   for f in "$INBOX_DIR"/*.json; do
     [[ ! -f "$f" ]] && continue
     PENDING=$((PENDING+1))
-    prio=$(python3 -c "import json; d=json.load(open('$f')); print(d.get('priority',''))" 2>/dev/null)
+    prio=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("priority",""))' "$f" 2>/dev/null)
     if [[ "$prio" == "high" || "$prio" == "urgent" ]]; then
       URGENT=$((URGENT+1))
-      FROM=$(python3 -c "import json; print(json.load(open('$f'))['from'])" 2>/dev/null)
-      TYPE=$(python3 -c "import json; print(json.load(open('$f'))['type'])" 2>/dev/null)
+      FROM=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["from"])' "$f" 2>/dev/null)
+      TYPE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["type"])' "$f" 2>/dev/null)
       URGENT_MSGS="$URGENT_MSGS\n  FROM: $FROM  TYPE: $TYPE"
     fi
   done
