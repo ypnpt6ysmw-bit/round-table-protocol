@@ -43,9 +43,11 @@ if [[ -d "$INBOX_DIR" ]]; then
   done
 fi
 
-# Save state
-echo "$(date +%s)" > "$STATE_FILE"
-echo "$PENDING" >> "$STATE_FILE"
+# Save state (atomic write: temp file then mv to prevent race conditions)
+tmp_state=$(mktemp "$RT_DIR/.checkin-state-${AGENT}.tmp.XXXXXX")
+echo "$(date +%s)" > "$tmp_state"
+echo "$PENDING" >> "$tmp_state"
+mv "$tmp_state" "$STATE_FILE"
 
 # Only output if there are new messages or urgent ones
 if [[ $PENDING -gt $LAST_COUNT ]] || [[ $URGENT -gt 0 ]]; then
