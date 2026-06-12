@@ -22,6 +22,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Read retention defaults from config.json when --older-than is not passed
+CONFIG_FILE="$ROUND_TABLE_DIR/config.json"
+if [[ -z "$OLDER_THAN" && -f "$CONFIG_FILE" ]]; then
+  RETENTION_DAYS=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('message_retention_days', ''))
+except Exception:
+    print('')
+" "$CONFIG_FILE" 2>/dev/null)
+  if [[ -n "$RETENTION_DAYS" && "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
+    OLDER_THAN=$((RETENTION_DAYS * 24))
+  fi
+fi
+
 if [[ -n "$OLDER_THAN" && ! "$OLDER_THAN" =~ ^[0-9]+$ ]]; then
   echo "Error: --older-than must be an integer (hours)" >&2; exit 1
 fi
@@ -62,7 +78,7 @@ for agent_dir in "$ROUND_TABLE_DIR"/inbox/*/; do
 
   # Newest-first list for --keep-last
   keep_set=""
-  if [[ -n "$KEEP_LAST" && $total -gt 0 ]]; then
+  if [[ -n "$KEEP_LAST" && "$KEEP_LAST" -gt 0 && $total -gt 0 ]]; then
     keep_set=$(ls -t "$agent_dir"*.json 2>/dev/null | head -n "$KEEP_LAST")
   fi
 
@@ -138,7 +154,28 @@ done
 shopt -u nullglob
 echo "  Artifacts: $art_count cleaned"
 
-# 5. Vacuum memory (remove tombstoned entries from jsonl, JSON-aware + atomic)
+# 6. Trim notifications.jsonl to prevent unbounded growth
+echo ""
+echo "--- Notification Cleanup ---"
+NOTIF_FILE="$ROUND_TABLE_DIR/notifications.jsonl"
+NOTIF_MAX_LINES=1000
+if [[ -f "$NOTIF_FILE" ]]; then
+  NOTIF_LINES=$(wc -l < "$NOTIF_FILE" 2>/dev/null | tr -d ' ' || echo 0)
+  if [[ "$NOTIF_LINES" -gt "$NOTIF_MAX_LINES" ]]; then
+    if [[ $DRY_RUN -eq 0 ]]; then
+      # Atomic trim: write last N lines to temp, then move
+      tmp=$(mktemp "$ROUND_TABLE_DIR/.notifications.tmp.XXXXXX")
+      tail -n "$NOTIF_MAX_LINES" "$NOTIF_FILE" > "$tmp"
+      mv "$tmp" "$NOTIF_FILE"
+    fi
+    TRIMMED=$((NOTIF_LINES - NOTIF_MAX_LINES))
+    echo "  Notifications: trimmed $TRIMMED old lines (kept last $NOTIF_MAX_LINES of $NOTIF_LINES)"
+  else
+    echo "  Notifications: $NOTIF_LINES lines (under limit of $NOTIF_MAX_LINES)"
+  fi
+else
+  echo "  (no notifications file)"
+fi
 echo ""
 echo "--- Memory Vacuum ---"
 MEM_FILE="$ROUND_TABLE_DIR/memory.jsonl"

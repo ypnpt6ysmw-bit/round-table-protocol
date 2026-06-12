@@ -78,7 +78,7 @@ for agent_dir in "$ROUND_TABLE_DIR"/inbox/*/; do
 
   # Newest-first list for --keep-last
   keep_set=""
-  if [[ -n "$KEEP_LAST" && $total -gt 0 ]]; then
+  if [[ -n "$KEEP_LAST" && "$KEEP_LAST" -gt 0 && $total -gt 0 ]]; then
     keep_set=$(ls -t "$agent_dir"*.json 2>/dev/null | head -n "$KEEP_LAST")
   fi
 
