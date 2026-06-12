@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "agents": ["arthur", "merlin", "percival", "bedivere", "lancelot"],
+  "default_trust": "trusted",
+  "message_retention_days": 30,
+  "snapshot_retention_days": 90
+}
