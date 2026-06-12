@@ -257,8 +257,11 @@ assert_contains "watch: shows agents" "lancelot"
 ### rt-daemon #############################################################
 run "daemon: status when stopped" 1 "$SCRIPTS/rt-daemon.sh" status
 run "daemon: start" 0 "$SCRIPTS/rt-daemon.sh" start
-sleep 1
-run "daemon: status running" 0 "$SCRIPTS/rt-daemon.sh" status
+# Wait for daemon to fully initialize (nohup + disown can take a moment)
+for i in 1 2 3 4 5; do
+  run "daemon: status running" 0 "$SCRIPTS/rt-daemon.sh" status && break
+  sleep 1
+done
 run "daemon: stop" 0 "$SCRIPTS/rt-daemon.sh" stop
 sleep 0.5
 run "daemon: status after stop" 1 "$SCRIPTS/rt-daemon.sh" status
