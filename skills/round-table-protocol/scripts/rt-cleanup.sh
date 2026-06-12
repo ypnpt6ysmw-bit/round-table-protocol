@@ -82,7 +82,7 @@ for agent_dir in "$ROUND_TABLE_DIR"/inbox/*/; do
     keep_set=$(ls -t "$agent_dir"*.json 2>/dev/null | head -n "$KEEP_LAST")
   fi
 
-  for f in "${files[@]}"; do
+  for f in "${files[@]+"${files[@]}"}"; do
     should_archive=0
     if is_old "$f"; then
       should_archive=1

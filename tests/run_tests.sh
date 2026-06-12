@@ -235,7 +235,8 @@ assert_file "cleanup: keep-last=0 archived zero-2" "$ROUND_TABLE_DIR/inbox/$KEEP
 assert_file "cleanup: keep-last=0 archived zero-3" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/zero-3.json"
 
 # keep-last combined with --older-than: old messages archived by age, rest by keep-last
-rm -rf "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived"
+rm -rf "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT"
+mkdir -p "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT"
 for i in 1 2 3 4; do
   echo "{\"id\":\"combo-$i\",\"from\":\"arthur\",\"to\":\"$KEEP_AGENT\",\"type\":\"status\",\"priority\":\"normal\",\"timestamp\":\"2020-01-0${i}T00:00:00Z\",\"payload\":{}}" > "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/combo-$i.json"
   touch -t 202001010000 "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/combo-$i.json"
