@@ -164,14 +164,24 @@ cmd_watch_loop() {
 
   local agent
   if [[ "$watcher" == "fswatch" ]]; then
-    fswatch -0 "${watch_dirs[@]}" 2>/dev/null | while read -r -d "" event; do
-      agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
-      [[ -n "$agent" ]] && check_new_messages "$agent"
+    while true; do
+      log "Watch loop: starting fswatch"
+      fswatch -0 "${watch_dirs[@]}" 2>/dev/null | while read -r -d "" event; do
+        agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
+        [[ -n "$agent" ]] && check_new_messages "$agent"
+      done
+      log "WARN: fswatch exited unexpectedly, restarting in 2s"
+      sleep 2
     done
   elif [[ "$watcher" == "inotifywait" ]]; then
-    inotifywait -m -r -e create -e moved_to --format '%w%f' "${watch_dirs[@]}" 2>/dev/null | while read -r event; do
-      agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
-      [[ -n "$agent" ]] && check_new_messages "$agent"
+    while true; do
+      log "Watch loop: starting inotifywait"
+      inotifywait -m -r -e create -e moved_to --format '%w%f' "${watch_dirs[@]}" 2>/dev/null | while read -r event; do
+        agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
+        [[ -n "$agent" ]] && check_new_messages "$agent"
+      done
+      log "WARN: inotifywait exited unexpectedly, restarting in 2s"
+      sleep 2
     done
   fi
 }
