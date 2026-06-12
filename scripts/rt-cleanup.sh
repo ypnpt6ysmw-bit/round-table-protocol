@@ -22,6 +22,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Read retention defaults from config.json when --older-than is not passed
+CONFIG_FILE="$ROUND_TABLE_DIR/config.json"
+if [[ -z "$OLDER_THAN" && -f "$CONFIG_FILE" ]]; then
+  RETENTION_DAYS=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('message_retention_days', ''))
+except Exception:
+    print('')
+" "$CONFIG_FILE" 2>/dev/null)
+  if [[ -n "$RETENTION_DAYS" && "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
+    OLDER_THAN=$((RETENTION_DAYS * 24))
+  fi
+fi
+
 if [[ -n "$OLDER_THAN" && ! "$OLDER_THAN" =~ ^[0-9]+$ ]]; then
   echo "Error: --older-than must be an integer (hours)" >&2; exit 1
 fi
