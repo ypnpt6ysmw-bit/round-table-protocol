@@ -38,8 +38,8 @@ check_new_messages() {
   for f in "${files[@]}"; do
     msg_id=$(basename "$f" .json)
 
-    # Check if already notified
-    if grep -qF "$msg_id" "$NOTIFICATIONS" 2>/dev/null; then
+    # Check if already notified (anchored match to avoid substring collisions)
+    if grep -qF "\"msg_id\": \"$msg_id\"" "$NOTIFICATIONS" 2>/dev/null; then
       continue
     fi
 
