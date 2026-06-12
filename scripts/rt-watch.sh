@@ -118,7 +118,7 @@ if not shown:
 if [[ $FOLLOW -eq 1 ]]; then
   echo "Watching Round Table activity (Ctrl+C to stop)..."
   while true; do
-    clear
+    tput clear 2>/dev/null || printf '\033[2J\033[H'
     show_snapshot
     sleep 2
   done
