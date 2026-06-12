@@ -38,8 +38,8 @@ check_new_messages() {
   for f in "${files[@]}"; do
     msg_id=$(basename "$f" .json)
 
-    # Check if already notified
-    if grep -qF "$msg_id" "$NOTIFICATIONS" 2>/dev/null; then
+    # Check if already notified (anchored match to avoid substring collisions)
+    if grep -qF "\"msg_id\": \"$msg_id\"" "$NOTIFICATIONS" 2>/dev/null; then
       continue
     fi
 
@@ -164,14 +164,24 @@ cmd_watch_loop() {
 
   local agent
   if [[ "$watcher" == "fswatch" ]]; then
-    fswatch -0 "${watch_dirs[@]}" 2>/dev/null | while read -r -d "" event; do
-      agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
-      [[ -n "$agent" ]] && check_new_messages "$agent"
+    while true; do
+      log "Watch loop: starting fswatch"
+      fswatch -0 "${watch_dirs[@]}" 2>/dev/null | while read -r -d "" event; do
+        agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
+        [[ -n "$agent" ]] && check_new_messages "$agent"
+      done
+      log "WARN: fswatch exited unexpectedly, restarting in 2s"
+      sleep 2
     done
   elif [[ "$watcher" == "inotifywait" ]]; then
-    inotifywait -m -r -e create -e moved_to --format '%w%f' "${watch_dirs[@]}" 2>/dev/null | while read -r event; do
-      agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
-      [[ -n "$agent" ]] && check_new_messages "$agent"
+    while true; do
+      log "Watch loop: starting inotifywait"
+      inotifywait -m -r -e create -e moved_to --format '%w%f' "${watch_dirs[@]}" 2>/dev/null | while read -r event; do
+        agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
+        [[ -n "$agent" ]] && check_new_messages "$agent"
+      done
+      log "WARN: inotifywait exited unexpectedly, restarting in 2s"
+      sleep 2
     done
   fi
 }
