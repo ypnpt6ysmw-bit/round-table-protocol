@@ -205,6 +205,50 @@ run "cleanup: empty memory vacuum" 0 "$SCRIPTS/rt-cleanup.sh" --older-than 9999
 run "cleanup: vacuum run" 0 "$SCRIPTS/rt-cleanup.sh" --older-than 9999
 run "cleanup: value mentioning deleted survives vacuum" 0 "$SCRIPTS/rt-memory.sh" get vacuum.trap
 
+# --keep-last tests
+# Create 5 messages for keep-last testing
+KEEP_AGENT="percival"
+mkdir -p "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT"
+for i in 1 2 3 4 5; do
+  echo "{\"id\":\"keep-$i\",\"from\":\"arthur\",\"to\":\"$KEEP_AGENT\",\"type\":\"status\",\"priority\":\"normal\",\"timestamp\":\"2025-01-0${i}T00:00:00Z\",\"payload\":{}}" > "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/keep-$i.json"
+done
+
+run "cleanup: keep-last basic" 0 "$SCRIPTS/rt-cleanup.sh" --keep-last 2
+# Should archive 3 (keep newest 2: keep-4, keep-5)
+assert_file "cleanup: keep-last archived keep-1" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/keep-1.json"
+assert_file "cleanup: keep-last archived keep-2" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/keep-2.json"
+assert_file "cleanup: keep-last archived keep-3" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/keep-3.json"
+# Newest 2 should remain in inbox
+KEEP4_RAW=$(ls "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/keep-4.json" 2>/dev/null)
+assert_file "cleanup: keep-last keeps keep-4" "$KEEP4_RAW"
+KEEP5_RAW=$(ls "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/keep-5.json" 2>/dev/null)
+assert_file "cleanup: keep-last keeps keep-5" "$KEEP5_RAW"
+
+# keep-last=0 should archive everything
+rm -rf "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived"
+for i in 1 2 3; do
+  echo "{\"id\":\"zero-$i\",\"from\":\"arthur\",\"to\":\"$KEEP_AGENT\",\"type\":\"status\",\"priority\":\"normal\",\"timestamp\":\"2025-01-0${i}T00:00:00Z\",\"payload\":{}}" > "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/zero-$i.json"
+done
+run "cleanup: keep-last zero archives all" 0 "$SCRIPTS/rt-cleanup.sh" --keep-last 0
+assert_file "cleanup: keep-last=0 archived zero-1" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/zero-1.json"
+assert_file "cleanup: keep-last=0 archived zero-2" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/zero-2.json"
+assert_file "cleanup: keep-last=0 archived zero-3" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/zero-3.json"
+
+# keep-last combined with --older-than: old messages archived by age, rest by keep-last
+rm -rf "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived"
+for i in 1 2 3 4; do
+  echo "{\"id\":\"combo-$i\",\"from\":\"arthur\",\"to\":\"$KEEP_AGENT\",\"type\":\"status\",\"priority\":\"normal\",\"timestamp\":\"2020-01-0${i}T00:00:00Z\",\"payload\":{}}" > "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/combo-$i.json"
+  touch -t 202001010000 "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/combo-$i.json"
+done
+# Add one recent message that should survive keep-last=1
+echo '{"id":"combo-recent","from":"arthur","to":"percival","type":"status","priority":"normal","timestamp":"2025-06-01T00:00:00Z","payload":{}}' > "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/combo-recent.json"
+run "cleanup: keep-last combined with older-than" 0 "$SCRIPTS/rt-cleanup.sh" --older-than 1 --keep-last 1
+# All old combo-1..4 archived (by age), recent kept by keep-last=1
+assert_file "cleanup: combo archived combo-1" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/combo-1.json"
+assert_file "cleanup: combo archived combo-2" "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/archived/combo-2.json"
+COMBO_RECENT_RAW=$(ls "$ROUND_TABLE_DIR/inbox/$KEEP_AGENT/combo-recent.json" 2>/dev/null)
+assert_file "cleanup: combo keeps recent" "$COMBO_RECENT_RAW"
+
 ### rt-watch ##############################################################
 run "watch: snapshot mode" 0 "$SCRIPTS/rt-watch.sh"
 assert_contains "watch: shows agents" "lancelot"
@@ -228,12 +272,33 @@ if [[ -f "$DAEMON_PIDFILE" ]]; then
 fi
 [[ "$ORPHANS" -eq 0 ]] && PASS=$((PASS+1)) || {
   FAIL=$((FAIL+1)); FAILED_NAMES+=("daemon: no orphans"); echo "FAIL: orphan daemon process still running (PID: $DAEMON_PID)"; }
+# check that child processes (fswatch/inotifywait/sleep) are also reaped
+CHILD_ORPHANS=0
+for child_pattern in fswatch inotifywait; do
+  if pgrep -f "$child_pattern" >/dev/null 2>&1; then
+    # Verify it's not a pre-existing system process by checking it was not running before start
+    CHILD_ORPHANS=1
+  fi
+done
+# Also check for leftover sleep processes that may be children of the daemon
+# Use a small window: look for sleep processes that are orphaned (PPID 1) and were likely daemon children
+if [[ "$(uname)" == "Darwin" ]]; then
+  ORPHAN_SLEEP=$(ps -eo pid,ppid,comm | awk '$2==1 && /sleep/ {print $1}' | head -5)
+else
+  ORPHAN_SLEEP=$(ps -eo pid,ppid,comm | awk '$2==1 && /sleep/ {print $1}' | head -5)
+fi
+if [[ -n "$ORPHAN_SLEEP" ]]; then
+  CHILD_ORPHANS=1
+fi
+[[ "$CHILD_ORPHANS" -eq 0 ]] && PASS=$((PASS+1)) || {
+  FAIL=$((FAIL+1)); FAILED_NAMES+=("daemon: no child orphans"); echo "FAIL: orphan child processes still running after daemon stop"; }
 
 ### generate-dashboard-data ###############################################
 run "dashboard data: generate" 0 "$SCRIPTS/generate-dashboard-data.sh"
 assert_file "dashboard data: messages.json" "$ROUND_TABLE_DIR/.dashboard/messages.json"
 assert_file "dashboard data: memory.json" "$ROUND_TABLE_DIR/.dashboard/memory.json"
 assert_valid_json "dashboard data: messages valid" "$ROUND_TABLE_DIR/.dashboard/messages.json"
+assert_valid_json "dashboard data: memory valid" "$ROUND_TABLE_DIR/.dashboard/memory.json"
 
 ### parity: scripts/ vs skills copy #######################################
 PARITY_OK=1
