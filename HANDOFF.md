@@ -89,7 +89,7 @@ All 5 agent profiles updated with `## Round Table Protocol` section containing:
 ## What Needs Attention
 
 1. ~~**Dashboard data is static**~~ — RESOLVED 2026-06-12: dashboard now fetches `.dashboard/{messages,memory,status}.json` every 5s with demo fallback (header pill shows Live/Demo). `generate-dashboard-data.sh` also emits `status.json` now.
-2. **Daemon needs manual start** — `rt-daemon.sh` runs in background but doesn't survive sessions. Should be managed by the cronjob. (Start no longer hangs callers — fixed 2026-06-12.)
+2. ~~**Daemon needs manual start**~~ — RESOLVED 2026-06-12: Cron jobs installed (`*/2 * * * *` auto-start + `*/5 * * * *` data refresh). Daemon running at PID tracked in `.dashboard/daemon.pid`. Logs at `.dashboard/httpd.log` and `.dashboard/cron.log`.
 3. **No real agent sessions yet** — The protocol works via scripts but no actual Hermes sessions have been spawned to use it yet.
 4. **Merge with existing codebase** — This was built outside the main Ari repo. Need to decide where it lives.
 
