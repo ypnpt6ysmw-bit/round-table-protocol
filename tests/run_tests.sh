@@ -218,9 +218,16 @@ run "daemon: stop" 0 "$SCRIPTS/rt-daemon.sh" stop
 sleep 0.5
 run "daemon: status after stop" 1 "$SCRIPTS/rt-daemon.sh" status
 # no orphan processes left behind
-ORPHANS=$(pgrep -f "rt-daemon.sh run" | wc -l | tr -d ' ')
+DAEMON_PIDFILE="$ROUND_TABLE_DIR/.daemon.pid"
+ORPHANS=0
+if [[ -f "$DAEMON_PIDFILE" ]]; then
+  DAEMON_PID=$(cat "$DAEMON_PIDFILE")
+  if kill -0 "$DAEMON_PID" 2>/dev/null; then
+    ORPHANS=1
+  fi
+fi
 [[ "$ORPHANS" -eq 0 ]] && PASS=$((PASS+1)) || {
-  FAIL=$((FAIL+1)); FAILED_NAMES+=("daemon: no orphans"); echo "FAIL: $ORPHANS orphan daemon processes"; pkill -f "rt-daemon.sh run"; }
+  FAIL=$((FAIL+1)); FAILED_NAMES+=("daemon: no orphans"); echo "FAIL: orphan daemon process still running (PID: $DAEMON_PID)"; }
 
 ### generate-dashboard-data ###############################################
 run "dashboard data: generate" 0 "$SCRIPTS/generate-dashboard-data.sh"
@@ -234,6 +241,14 @@ for f in "$SCRIPTS"/rt-*.sh; do
   b=$(basename "$f")
   if [[ -f "$REPO_DIR/skills/round-table-protocol/scripts/$b" ]]; then
     diff -q "$f" "$REPO_DIR/skills/round-table-protocol/scripts/$b" >/dev/null || PARITY_OK=0
+  else
+    PARITY_OK=0
+  fi
+done
+for f in "$REPO_DIR/skills/round-table-protocol/scripts"/rt-*.sh; do
+  b=$(basename "$f")
+  if [[ ! -f "$SCRIPTS/$b" ]]; then
+    PARITY_OK=0
   fi
 done
 [[ $PARITY_OK -eq 1 ]] && PASS=$((PASS+1)) || {
