@@ -2,7 +2,8 @@
 # Populate Round Table with demo data for dashboard visualization
 set -euo pipefail
 
-RT_DIR="/Users/arielkurek/.hermes/round-table"
+RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+mkdir -p "$RT_DIR/status"
 
 # Status files
 cat > "$RT_DIR/status/arthur.json" << 'EOF'
@@ -25,4 +26,4 @@ cat > "$RT_DIR/status/lancelot.json" << 'EOF'
 {"agent":"lancelot","timestamp":"2026-06-12T13:00:00Z","current_task":"Running QA test suite","status":"working","progress":"4 of 7 tests","blockers":[],"offering":["QA","testing"],"seeking":[],"last_active":"2026-06-12T13:00:00Z"}
 EOF
 
-echo "Status files written"
+echo "Status files written to $RT_DIR/status"

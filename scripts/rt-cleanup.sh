@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # rt-cleanup.sh — Message lifecycle management for Round Table Protocol
 # Usage: rt-cleanup.sh [--dry-run] [--older-than <hours>] [--keep-last <n>]
+#
+# --older-than N : archive inbox messages / delete outbox+snapshots+artifacts older than N hours
+# --keep-last N  : per inbox, archive everything except the N newest messages
+# Both filters may be combined (a message is archived if either matches).
+# Memory vacuum (drop tombstoned entries) always runs unless --dry-run.
 set -euo pipefail
 
 ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
@@ -17,6 +22,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -n "$OLDER_THAN" && ! "$OLDER_THAN" =~ ^[0-9]+$ ]]; then
+  echo "Error: --older-than must be an integer (hours)" >&2; exit 1
+fi
+if [[ -n "$KEEP_LAST" && ! "$KEEP_LAST" =~ ^[0-9]+$ ]]; then
+  echo "Error: --keep-last must be an integer" >&2; exit 1
+fi
+
+file_age_secs() {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo $(( $(date +%s) - $(stat -f %m "$1") ))
+  else
+    echo $(( $(date +%s) - $(stat -c %Y "$1") ))
+  fi
+}
+
+is_old() {
+  [[ -z "$OLDER_THAN" ]] && return 1
+  local age
+  age=$(file_age_secs "$1")
+  [[ $age -gt $((OLDER_THAN * 3600)) ]]
+}
+
 echo "=== Round Table Protocol Cleanup ==="
 echo ""
 
@@ -25,22 +52,27 @@ echo "--- Inbox Cleanup ---"
 for agent_dir in "$ROUND_TABLE_DIR"/inbox/*/; do
   [[ ! -d "$agent_dir" ]] && continue
   agent=$(basename "$agent_dir")
+  [[ "$agent" == "archived" ]] && continue
+
+  shopt -s nullglob
+  files=("$agent_dir"*.json)
+  shopt -u nullglob
+  total=${#files[@]}
   count=0
-  total=0
 
-  for f in "$agent_dir"/*.json; do
-    [[ ! -f "$f" ]] && continue
-    total=$((total+1))
+  # Newest-first list for --keep-last
+  keep_set=""
+  if [[ -n "$KEEP_LAST" && $total -gt 0 ]]; then
+    keep_set=$(ls -t "$agent_dir"*.json 2>/dev/null | head -n "$KEEP_LAST")
+  fi
 
+  for f in "${files[@]}"; do
     should_archive=0
-    if [[ -n "$OLDER_THAN" ]]; then
-      # Check file age
-      if [[ "$(uname)" == "Darwin" ]]; then
-        age=$(( $(date +%s) - $(stat -f %m "$f") ))
-      else
-        age=$(( $(date +%s) - $(stat -c %Y "$f") ))
-      fi
-      if [[ $age -gt $((OLDER_THAN * 3600)) ]]; then
+    if is_old "$f"; then
+      should_archive=1
+    fi
+    if [[ -n "$KEEP_LAST" ]]; then
+      if ! grep -qxF "$f" <<< "$keep_set"; then
         should_archive=1
       fi
     fi
@@ -55,13 +87,6 @@ for agent_dir in "$ROUND_TABLE_DIR"/inbox/*/; do
     fi
   done
 
-  archived=$total
-  if [[ -n "$KEEP_LAST" ]]; then
-    # Don't count the last N files
-    archived=$((total - KEEP_LAST))
-    [[ $archived -lt 0 ]] && archived=0
-  fi
-
   echo "  $agent: $total messages, $count archived"
 done
 
@@ -73,22 +98,14 @@ for agent_dir in "$ROUND_TABLE_DIR"/outbox/*/; do
   agent=$(basename "$agent_dir")
   count=0
 
-  for f in "$agent_dir"/*.json; do
-    [[ ! -f "$f" ]] && continue
-    if [[ -n "$OLDER_THAN" ]]; then
-      if [[ "$(uname)" == "Darwin" ]]; then
-        age=$(( $(date +%s) - $(stat -f %m "$f") ))
-      else
-        age=$(( $(date +%s) - $(stat -c %Y "$f") ))
-      fi
-      if [[ $age -gt $((OLDER_THAN * 3600)) ]]; then
-        if [[ $DRY_RUN -eq 0 ]]; then
-          rm "$f"
-        fi
-        count=$((count+1))
-      fi
+  shopt -s nullglob
+  for f in "$agent_dir"*.json; do
+    if is_old "$f"; then
+      [[ $DRY_RUN -eq 0 ]] && rm "$f"
+      count=$((count+1))
     fi
   done
+  shopt -u nullglob
 
   echo "  $agent: $count messages cleaned"
 done
@@ -97,64 +114,70 @@ done
 echo ""
 echo "--- Snapshot Cleanup ---"
 snap_count=0
+shopt -s nullglob
 for f in "$ROUND_TABLE_DIR"/snapshots/*.json; do
-  [[ ! -f "$f" ]] && continue
-  if [[ -n "$OLDER_THAN" ]]; then
-    if [[ "$(uname)" == "Darwin" ]]; then
-      age=$(( $(date +%s) - $(stat -f %m "$f") ))
-    else
-      age=$(( $(date +%s) - $(stat -c %Y "$f") ))
-    fi
-    if [[ $age -gt $((OLDER_THAN * 3600)) ]]; then
-      if [[ $DRY_RUN -eq 0 ]]; then
-        rm "$f"
-      fi
-      snap_count=$((snap_count+1))
-    fi
+  if is_old "$f"; then
+    [[ $DRY_RUN -eq 0 ]] && rm "$f"
+    snap_count=$((snap_count+1))
   fi
 done
+shopt -u nullglob
 echo "  Snapshots: $snap_count cleaned"
 
 # 4. Clean up old artifacts
 echo ""
 echo "--- Artifact Cleanup ---"
 art_count=0
+shopt -s nullglob
 for f in "$ROUND_TABLE_DIR"/artifacts/*.json; do
-  [[ ! -f "$f" ]] && continue
-  if [[ -n "$OLDER_THAN" ]]; then
-    if [[ "$(uname)" == "Darwin" ]]; then
-      age=$(( $(date +%s) - $(stat -f %m "$f") ))
-    else
-      age=$(( $(date +%s) - $(stat -c %Y "$f") ))
-    fi
-    if [[ $age -gt $((OLDER_THAN * 3600)) ]]; then
-      if [[ $DRY_RUN -eq 0 ]]; then
-        rm "$f"
-      fi
-      art_count=$((art_count+1))
-    fi
+  if is_old "$f"; then
+    [[ $DRY_RUN -eq 0 ]] && rm "$f"
+    art_count=$((art_count+1))
   fi
 done
+shopt -u nullglob
 echo "  Artifacts: $art_count cleaned"
 
-# 5. Vacuum memory (remove deleted entries from jsonl)
+# 5. Vacuum memory (remove tombstoned entries from jsonl, JSON-aware + atomic)
 echo ""
 echo "--- Memory Vacuum ---"
-if [[ $DRY_RUN -eq 0 ]]; then
-  lines=$(wc -l < "$ROUND_TABLE_DIR/memory.jsonl" 2>/dev/null || echo 0)
-  active=$(grep -cv '"deleted": true' "$ROUND_TABLE_DIR/memory.jsonl" 2>/dev/null || echo 0)
-  deleted=$((lines - active))
-  echo "  Before: $lines entries ($active active, $deleted deleted)"
+MEM_FILE="$ROUND_TABLE_DIR/memory.jsonl"
+if [[ -f "$MEM_FILE" ]]; then
+  python3 -c "
+import json, os, sys, tempfile
 
-  # Rewrite file without deleted entries
-  grep -v '"deleted": true' "$ROUND_TABLE_DIR/memory.jsonl" > "$ROUND_TABLE_DIR/memory.jsonl.tmp" 2>/dev/null || true
-  mv "$ROUND_TABLE_DIR/memory.jsonl.tmp" "$ROUND_TABLE_DIR/memory.jsonl"
+mem_file = sys.argv[1]
+dry_run = sys.argv[2] == '1'
+kept, removed, bad = [], 0, 0
+for line in open(mem_file):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        bad += 1
+        kept.append(line)  # never drop lines we can't parse
+        continue
+    if entry.get('deleted'):
+        removed += 1
+    else:
+        kept.append(json.dumps(entry, ensure_ascii=False))
 
-  new_lines=$(wc -l < "$ROUND_TABLE_DIR/memory.jsonl" 2>/dev/null || echo 0)
-  echo "  After: $new_lines entries (removed $deleted deleted)"
+if dry_run:
+    print(f'  Would remove {removed} deleted entries (dry run)')
+else:
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(mem_file), prefix='.memory.tmp.')
+    with os.fdopen(fd, 'w') as f:
+        for line in kept:
+            f.write(line + '\n')
+    os.replace(tmp, mem_file)
+    print(f'  Removed {removed} deleted entries, kept {len(kept)}')
+if bad:
+    print(f'  Warning: {bad} unparseable lines preserved', file=sys.stderr)
+" "$MEM_FILE" "$DRY_RUN"
 else
-  deleted=$(grep -c '"deleted": true' "$ROUND_TABLE_DIR/memory.jsonl" 2>/dev/null || echo 0)
-  echo "  Would remove $deleted deleted entries (dry run)"
+  echo "  (no memory file)"
 fi
 
 echo ""

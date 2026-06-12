@@ -88,7 +88,22 @@ All 5 agent profiles updated with `## Round Table Protocol` section containing:
 
 ## What Needs Attention
 
-1. **Dashboard data is static** — The demo data is hardcoded in the HTML. Live data comes from the cronjob running `generate-dashboard-data.sh` which feeds `.dashboard/messages.json` and `.dashboard/memory.json`. The dashboard frontend needs to fetch these (currently uses embedded data).
-2. **Daemon needs manual start** — `rt-daemon.sh` runs in background but doesn't survive sessions. Should be managed by the cronjob.
+1. ~~**Dashboard data is static**~~ — RESOLVED 2026-06-12: dashboard now fetches `.dashboard/{messages,memory,status}.json` every 5s with demo fallback (header pill shows Live/Demo). `generate-dashboard-data.sh` also emits `status.json` now.
+2. **Daemon needs manual start** — `rt-daemon.sh` runs in background but doesn't survive sessions. Should be managed by the cronjob. (Start no longer hangs callers — fixed 2026-06-12.)
 3. **No real agent sessions yet** — The protocol works via scripts but no actual Hermes sessions have been spawned to use it yet.
 4. **Merge with existing codebase** — This was built outside the main Ari repo. Need to decide where it lives.
+
+## QA Pass 2026-06-12
+
+Full test/review/fix cycle completed. `tests/run_tests.sh` added (74 assertions, sandboxed via `ROUND_TABLE_DIR`); all pass, shellcheck clean. Fixed:
+
+- **rt-daemon start hung any caller capturing output** (child inherited stdout) — now `nohup … < /dev/null >> log &` + disown; stop also kills watcher children
+- **Shell→Python injection** in rt-memory/rt-inbox/rt-checkin/rt-watch/rt-daemon (keys/queries/paths interpolated into Python source) — all values now passed via argv/env
+- **No agent validation in rt-send** — `--to ../evil` created directories outside inbox/; now validated against config registry + `^[a-z0-9_-]+$`
+- **Memory tombstones didn't shadow older revisions** — get/search/list returned pre-delete values; latest-entry-wins now
+- **rt-status/snapshot/artifact** wrote into possibly missing dirs and truncated before write — now mkdir -p + atomic temp+rename (rt-send delivery also atomic)
+- **rt-cleanup**: `--keep-last` was parsed but unimplemented — now works; grep-based memory vacuum (ate values containing `"deleted": true`, crashed on empty file) replaced with JSON-aware atomic vacuum
+- **rt-artifact** notification payload built by string interpolation — quotes in `--desc` broke JSON; now built with `json.dumps`; send failures surface a warning instead of silent `|| true`
+- **generate-dashboard-data.sh / populate-demo.sh** hardcoded `/Users/arielkurek` — now honor `ROUND_TABLE_DIR`
+- **rt-status** validates status enum; **rt-watch** dead `--recent` flag removed, agent list from config; dashboard HTML-escapes all dynamic strings (XSS)
+- `skills/round-table-protocol/scripts/` copies re-synced (test suite enforces parity)

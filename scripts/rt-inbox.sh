@@ -29,23 +29,33 @@ if [[ -z "$AGENT" ]]; then
   exit 1
 fi
 
+if [[ ! "$AGENT" =~ ^[a-z0-9_-]+$ ]]; then
+  echo "Error: invalid agent name: $AGENT" >&2
+  exit 1
+fi
+
 INBOX_DIR="$ROUND_TABLE_DIR/inbox/$AGENT"
 mkdir -p "$INBOX_DIR"
 
 case "$ACTION" in
   list)
     echo "=== Inbox: $AGENT ==="
-    if [[ -z "$(ls -A "$INBOX_DIR" 2>/dev/null)" ]]; then
+    shopt -s nullglob
+    FILES=("$INBOX_DIR"/*.json)
+    shopt -u nullglob
+    if [[ ${#FILES[@]} -eq 0 ]]; then
       echo "(empty)"
       exit 0
     fi
-    for f in "$INBOX_DIR"/*.json; do
-      [[ ! -f "$f" ]] && continue
+    for f in "${FILES[@]}"; do
       python3 -c "
-import json
-d = json.load(open('$f'))
-print('  {}... | {:20s} | from: {:10s} | prio: {}'.format(d['id'][:12], d['type'], d['from'], d['priority']))
-" 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('  {}... | {:20s} | from: {:10s} | prio: {}'.format(d['id'][:12], d['type'], d['from'], d['priority']))
+except Exception as e:
+    print('  [unreadable] {}: {}'.format(sys.argv[1], e), file=sys.stderr)
+" "$f"
     done
     ;;
   read)
@@ -54,13 +64,13 @@ print('  {}... | {:20s} | from: {:10s} | prio: {}'.format(d['id'][:12], d['type'
     FILE="$INBOX_DIR/${MSG_ID}.json"
     [[ ! -f "$FILE" ]] && { echo "Message $MSG_ID not found" >&2; exit 1; }
     python3 -c "
-import json
-msg = json.load(open('$FILE'))
+import json, sys
+msg = json.load(open(sys.argv[1]))
 print('From:', msg['from'], '  To:', msg['to'], '  Type:', msg['type'], '  Priority:', msg['priority'])
 print('Time:', msg['timestamp'], '  ID:', msg['id'])
 print()
 print(json.dumps(msg['payload'], indent=2, ensure_ascii=False))
-"
+" "$FILE"
     ;;
   ack)
     MSG_ID="${1:-}"

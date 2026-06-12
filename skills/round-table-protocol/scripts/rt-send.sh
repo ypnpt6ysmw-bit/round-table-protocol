@@ -30,12 +30,33 @@ done
 [[ -z "$TYPE" ]] && { echo "Error: --type required" >&2; exit 1; }
 [[ -z "$PAYLOAD" ]] && { echo "Error: --payload required" >&2; exit 1; }
 
+AGENTS=$(python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['agents']))" "$CONFIG" 2>/dev/null \
+  || echo "arthur merlin percival bedivere lancelot")
+
+# Agent names become path components — must be registry-known and traversal-safe
+validate_agent() {
+  local name="$1" role="$2"
+  if [[ ! "$name" =~ ^[a-z0-9_-]+$ ]]; then
+    echo "Error: invalid $role agent name: $name" >&2
+    exit 1
+  fi
+  local a
+  for a in $AGENTS; do
+    [[ "$a" == "$name" ]] && return 0
+  done
+  echo "Error: unknown $role agent: $name (known: $AGENTS)" >&2
+  exit 1
+}
+
+validate_agent "$FROM" "--from"
+[[ "$TO" != "broadcast" ]] && validate_agent "$TO" "--to"
+
 MSG_ID=$(python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || echo "msg-$(date +%s)-$$")
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Write payload to temp file so Python can read it without stdin conflicts
-PAYLOAD_FILE=$(mktemp /tmp/rtp_payload.XXXXXX)
-echo "$PAYLOAD" > "$PAYLOAD_FILE"
+PAYLOAD_FILE=$(mktemp "${TMPDIR:-/tmp}/rtp_payload.XXXXXX")
+printf '%s' "$PAYLOAD" > "$PAYLOAD_FILE"
 
 export RTP_MSG_ID="$MSG_ID"
 export RTP_FROM="$FROM"
@@ -56,12 +77,12 @@ reply_to = os.environ.get('RTP_REPLY_TO', '')
 
 try:
     reply_obj = json.loads(reply_to) if reply_to else None
-except:
-    reply_obj = reply_to if reply_to else None
+except ValueError:
+    reply_obj = reply_to
 
 try:
     payload = json.loads(payload_raw)
-except:
+except ValueError:
     payload = payload_raw
 
 envelope = {
@@ -85,23 +106,28 @@ rm -f "$PAYLOAD_FILE"
 # Write to outbox
 OUTBOX_DIR="$ROUND_TABLE_DIR/outbox/$FROM"
 mkdir -p "$OUTBOX_DIR"
-echo "$MSG" > "$OUTBOX_DIR/${MSG_ID}.json"
+printf '%s\n' "$MSG" > "$OUTBOX_DIR/${MSG_ID}.json"
 
-# Deliver to inbox
+# Deliver atomically: temp file in target dir, then mv, so a polling reader
+# never sees a partial message.
+deliver() {
+  local inbox_dir="$ROUND_TABLE_DIR/inbox/$1"
+  mkdir -p "$inbox_dir"
+  local tmp
+  tmp=$(mktemp "$inbox_dir/.${MSG_ID}.tmp.XXXXXX")
+  cp "$OUTBOX_DIR/${MSG_ID}.json" "$tmp"
+  mv "$tmp" "$inbox_dir/${MSG_ID}.json"
+}
+
 if [[ "$TO" == "broadcast" ]]; then
-  AGENTS=$(python3 -c "import json; print(' '.join(json.load(open('$CONFIG'))['agents']))" 2>/dev/null || echo "arthur merlin percival bedivere lancelot")
   COUNT=0
   for agent in $AGENTS; do
     [[ "$agent" == "$FROM" ]] && continue
-    INBOX_DIR="$ROUND_TABLE_DIR/inbox/$agent"
-    mkdir -p "$INBOX_DIR"
-    cp "$OUTBOX_DIR/${MSG_ID}.json" "$INBOX_DIR/${MSG_ID}.json"
+    deliver "$agent"
     COUNT=$((COUNT+1))
   done
   echo "Broadcast delivered to $COUNT agents"
 else
-  INBOX_DIR="$ROUND_TABLE_DIR/inbox/$TO"
-  mkdir -p "$INBOX_DIR"
-  cp "$OUTBOX_DIR/${MSG_ID}.json" "$INBOX_DIR/${MSG_ID}.json"
+  deliver "$TO"
   echo "Message delivered to $TO ($MSG_ID)"
 fi

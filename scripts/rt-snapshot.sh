@@ -23,7 +23,12 @@ export RTP_SUMMARY="$SUMMARY"
 export RTP_SNAPSHOT_ID="$SNAPSHOT_ID"
 export RTP_TIMESTAMP="$TIMESTAMP"
 
-python3 << 'PYEOF' > "$ROUND_TABLE_DIR/snapshots/${SNAPSHOT_ID}.json"
+# Atomic write: temp file then rename
+SNAP_DIR="$ROUND_TABLE_DIR/snapshots"
+mkdir -p "$SNAP_DIR"
+TMP_FILE=$(mktemp "$SNAP_DIR/.${SNAPSHOT_ID}.tmp.XXXXXX")
+
+python3 << 'PYEOF' > "$TMP_FILE"
 import json, os
 
 snapshot = {
@@ -46,6 +51,8 @@ snapshot = {
 }
 print(json.dumps(snapshot, indent=2, ensure_ascii=False))
 PYEOF
+
+mv "$TMP_FILE" "$SNAP_DIR/${SNAPSHOT_ID}.json"
 
 echo "Snapshot saved: $SNAPSHOT_ID"
 echo "  Agent: $AGENT | Session: $SESSION_ID"

@@ -3,7 +3,7 @@
 # Watches all inboxes for new messages and writes notifications to a shared notification stream.
 # Usage: rt-daemon.sh start|stop|status|run
 #
-# Single-node mode: uses inotifywait (macOS: fswatch) to watch inbox directories.
+# Single-node mode: uses fswatch (macOS) / inotifywait (Linux) to watch inbox directories.
 # Falls back to polling if no file watcher is available.
 set -euo pipefail
 
@@ -17,7 +17,8 @@ mkdir -p "$ROUND_TABLE_DIR"
 touch "$NOTIFICATIONS"
 
 get_agents() {
-  python3 -c "import json; print(' '.join(json.load(open('$CONFIG'))['agents']))" 2>/dev/null || echo "arthur merlin percival bedivere lancelot"
+  python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['agents']))" "$CONFIG" 2>/dev/null \
+    || echo "arthur merlin percival bedivere lancelot"
 }
 
 log() {
@@ -27,11 +28,14 @@ log() {
 check_new_messages() {
   local agent="$1"
   local inbox="$ROUND_TABLE_DIR/inbox/$agent"
-  [[ ! -d "$inbox" ]] && return
+  [[ ! -d "$inbox" ]] && return 0
 
-  for f in "$inbox"/*.json; do
-    [[ ! -f "$f" ]] && continue
-    local msg_id
+  shopt -s nullglob
+  local files=("$inbox"/*.json)
+  shopt -u nullglob
+
+  local f msg_id ts
+  for f in "${files[@]}"; do
     msg_id=$(basename "$f" .json)
 
     # Check if already notified
@@ -39,23 +43,25 @@ check_new_messages() {
       continue
     fi
 
-    # Read message and write notification
-    python3 -c "
+    ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    if python3 -c "
 import json, sys
-msg = json.load(open('$f'))
+msg = json.load(open(sys.argv[1]))
 notif = {
-    'timestamp': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'timestamp': sys.argv[2],
     'msg_id': msg['id'],
     'from': msg['from'],
     'to': msg['to'],
     'type': msg['type'],
     'priority': msg['priority'],
-    'notified_agent': '$agent'
+    'notified_agent': sys.argv[3]
 }
 print(json.dumps(notif))
-" >> "$NOTIFICATIONS"
-
-    log "Notified $agent about $msg_id from $(python3 -c "import json; print(json.load(open('$f'))['from'])" 2>/dev/null)"
+" "$f" "$ts" "$agent" >> "$NOTIFICATIONS" 2>/dev/null; then
+      log "Notified $agent about $msg_id"
+    else
+      log "WARN: unreadable message $f"
+    fi
   done
 }
 
@@ -72,9 +78,11 @@ cmd_start() {
   log "Starting daemon"
   echo "Starting Round Table Daemon..."
 
-  # Run daemon in background
-  "$0" run &
+  # Fully detach: redirect stdio so callers capturing our output are not
+  # held open by the child, and disown so shell teardown doesn't signal it.
+  nohup "$0" run >> "$LOGFILE" 2>&1 < /dev/null &
   local pid=$!
+  disown "$pid" 2>/dev/null || true
   echo "$pid" > "$PIDFILE"
   echo "Daemon started (PID: $pid)"
   log "Daemon started with PID $pid"
@@ -88,6 +96,8 @@ cmd_stop() {
   local pid
   pid=$(cat "$PIDFILE")
   if kill -0 "$pid" 2>/dev/null; then
+    # Kill watcher/sleep children first, then the daemon itself
+    pkill -P "$pid" 2>/dev/null || true
     kill "$pid" 2>/dev/null || true
     rm -f "$PIDFILE"
     echo "Daemon stopped (PID: $pid)"
@@ -105,7 +115,7 @@ cmd_status() {
     if kill -0 "$pid" 2>/dev/null; then
       echo "Daemon running (PID: $pid)"
       local count
-      count=$(wc -l < "$NOTIFICATIONS" 2>/dev/null || echo 0)
+      count=$(wc -l < "$NOTIFICATIONS" 2>/dev/null | tr -d ' ' || echo 0)
       echo "Notifications delivered: $count"
       return 0
     fi
@@ -146,22 +156,21 @@ cmd_poll_loop() {
 
 cmd_watch_loop() {
   local watcher="$1"
-  local watch_dirs=""
+  local watch_dirs=()
   for agent in $(get_agents); do
-    watch_dirs="$watch_dirs $ROUND_TABLE_DIR/inbox/$agent"
+    mkdir -p "$ROUND_TABLE_DIR/inbox/$agent"
+    watch_dirs+=("$ROUND_TABLE_DIR/inbox/$agent")
   done
 
+  local agent
   if [[ "$watcher" == "fswatch" ]]; then
-    fswatch -0 $watch_dirs 2>/dev/null | while read -d "" event; do
-      # Extract agent from path
-      local agent
-      agent=$(echo "$event" | sed -E 's|.*/inbox/([^/]+)/.*|\1|')
+    fswatch -0 "${watch_dirs[@]}" 2>/dev/null | while read -r -d "" event; do
+      agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
       [[ -n "$agent" ]] && check_new_messages "$agent"
     done
   elif [[ "$watcher" == "inotifywait" ]]; then
-    inotifywait -m -r -e create --format '%w%f' $watch_dirs 2>/dev/null | while read -r event; do
-      local agent
-      agent=$(echo "$event" | sed -E 's|.*/inbox/([^/]+)/.*|\1|')
+    inotifywait -m -r -e create -e moved_to --format '%w%f' "${watch_dirs[@]}" 2>/dev/null | while read -r event; do
+      agent=$(sed -E 's|.*/inbox/([^/]+)/.*|\1|' <<< "$event")
       [[ -n "$agent" ]] && check_new_messages "$agent"
     done
   fi

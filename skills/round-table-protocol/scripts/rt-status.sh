@@ -23,6 +23,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "$STATUS" in
+  working|blocked|idle|done) ;;
+  *) echo "Error: --status must be working|blocked|idle|done (got: $STATUS)" >&2; exit 1 ;;
+esac
+
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 export RTP_AGENT="$AGENT"
@@ -32,14 +37,21 @@ export RTP_PROGRESS="$PROGRESS"
 export RTP_BLOCKER="$BLOCKER"
 export RTP_TIMESTAMP="$TIMESTAMP"
 
-python3 << 'PYEOF' > "$ROUND_TABLE_DIR/status/${AGENT}.json"
+# Atomic write: temp file then rename, so readers never see a truncated card
+STATUS_DIR="$ROUND_TABLE_DIR/status"
+mkdir -p "$STATUS_DIR"
+TMP_FILE=$(mktemp "$STATUS_DIR/.${AGENT}.tmp.XXXXXX")
+
+python3 << 'PYEOF' > "$TMP_FILE"
 import json, os
 
 blocker_raw = os.environ.get('RTP_BLOCKER', '')
 try:
     blockers = json.loads(blocker_raw) if blocker_raw else []
-except:
-    blockers = [blocker_raw] if blocker_raw else []
+except ValueError:
+    blockers = [blocker_raw]
+if not isinstance(blockers, list):
+    blockers = [blockers]
 
 status = {
     'agent': os.environ['RTP_AGENT'],
@@ -54,6 +66,8 @@ status = {
 }
 print(json.dumps(status, indent=2, ensure_ascii=False))
 PYEOF
+
+mv "$TMP_FILE" "$STATUS_DIR/${AGENT}.json"
 
 echo "Status: $AGENT → $STATUS"
 [[ -n "$TASK" ]] && echo "  Task: $TASK" || true

@@ -40,7 +40,12 @@ export RTP_STATUS="$STATUS"
 export RTP_ARTIFACT_ID="$ARTIFACT_ID"
 export RTP_TIMESTAMP="$TIMESTAMP"
 
-python3 << 'PYEOF' > "$ROUND_TABLE_DIR/artifacts/${ARTIFACT_ID}.json"
+# Atomic write: temp file then rename
+ART_DIR="$ROUND_TABLE_DIR/artifacts"
+mkdir -p "$ART_DIR"
+TMP_FILE=$(mktemp "$ART_DIR/.${ARTIFACT_ID}.tmp.XXXXXX")
+
+python3 << 'PYEOF' > "$TMP_FILE"
 import json, os
 
 produced_for = os.environ.get('RTP_FOR', '') or None
@@ -61,13 +66,23 @@ artifact = {
 print(json.dumps(artifact, indent=2, ensure_ascii=False))
 PYEOF
 
+mv "$TMP_FILE" "$ART_DIR/${ARTIFACT_ID}.json"
+
 echo "Artifact registered: $ARTIFACT_ID"
 echo "  File: $FILE_PATH | Status: $STATUS"
 
 if [[ -n "$FOR_AGENT" ]]; then
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-  ROUND_TABLE_DIR="$ROUND_TABLE_DIR" "$SCRIPT_DIR/rt-send.sh" \
+  # Build payload with json.dumps so quotes in description can't break the JSON
+  NOTIFY_PAYLOAD=$(python3 -c "
+import json, sys
+print(json.dumps({'artifact_id': sys.argv[1], 'file': sys.argv[2], 'description': sys.argv[3]}))
+" "$ARTIFACT_ID" "$FILE_PATH" "$DESCRIPTION")
+  if ROUND_TABLE_DIR="$ROUND_TABLE_DIR" "$SCRIPT_DIR/rt-send.sh" \
     --from "$AGENT" --to "$FOR_AGENT" --type artifact --priority normal \
-    --payload "{\"artifact_id\": \"$ARTIFACT_ID\", \"file\": \"$FILE_PATH\", \"description\": \"$DESCRIPTION\"}" 2>/dev/null || true
-  echo "  Notification sent to $FOR_AGENT"
+    --payload "$NOTIFY_PAYLOAD" >/dev/null; then
+    echo "  Notification sent to $FOR_AGENT"
+  else
+    echo "  Warning: notification to $FOR_AGENT failed" >&2
+  fi
 fi

@@ -63,12 +63,22 @@ open dashboard/dashboard.html
 
 ## Dashboard
 
-Open `dashboard/dashboard.html` in a browser. Features:
+Serve the round-table directory over HTTP (e.g. `python3 -m http.server 8101 -d ~/.hermes/round-table`) and open `dashboard.html`. Features:
 - 5 agent cards with status, progress bars
 - Message feed with from→to, type, priority
 - Shared memory table
 - Stats row (agents, active, messages, memory)
-- Auto-refreshes every 5 seconds
+- Fetches live data from `.dashboard/*.json` every 5 seconds (run `generate-dashboard-data.sh` on a cron); falls back to demo data when no live data is reachable — the header pill shows **Live** or **Demo**
+
+## Testing
+
+```bash
+tests/run_tests.sh
+```
+
+Runs 74 assertions against a sandboxed `ROUND_TABLE_DIR` (no touch of `~/.hermes`): send/broadcast/validation, inbox lifecycle, memory CRUD + tombstone semantics + injection resistance, status/snapshot/artifact atomic writes, cleanup (`--older-than`, `--keep-last`, JSON-aware vacuum), daemon start/stop/no-orphans, dashboard data generation, and `scripts/` ↔ `skills/` parity.
+
+All scripts honor `ROUND_TABLE_DIR` env override. Lint with `shellcheck scripts/*.sh`.
 
 ## Skill
 

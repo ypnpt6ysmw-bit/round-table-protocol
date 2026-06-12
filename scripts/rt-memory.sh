@@ -11,6 +11,7 @@
 #   rt-memory.sh clear [--agent <agent>] [--older-than <hours>]
 #
 # Storage: ~/.hermes/round-table/memory.jsonl (append-only log)
+# All user-supplied values reach Python via argv/env — never via source interpolation.
 set -euo pipefail
 
 ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
@@ -54,15 +55,20 @@ case "$ACTION" in
 
     FROM="${FROM:-$(hostname -s | tr '[:upper:]' '[:lower:]')}"
     TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    EXPIRES=""
-    if [[ -n "$TTL" ]]; then
-      EXPIRES=$(date -u -v+"${TTL}H" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(hours=int('$TTL'))).strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || echo "")
-    fi
 
-    export RTP_KEY="$KEY" RTP_VALUE="$VALUE" RTP_FROM="$FROM" RTP_TAGS="$TAGS" RTP_TTL="$TTL" RTP_TIMESTAMP="$TIMESTAMP" RTP_EXPIRES="$EXPIRES"
+    export RTP_KEY="$KEY" RTP_VALUE="$VALUE" RTP_FROM="$FROM" RTP_TAGS="$TAGS" RTP_TTL="$TTL" RTP_TIMESTAMP="$TIMESTAMP"
 
     python3 << 'PYEOF' >> "$MEMORY_FILE"
 import json, os, uuid
+from datetime import datetime, timezone, timedelta
+
+ttl = os.environ.get('RTP_TTL', '')
+expires = None
+if ttl:
+    try:
+        expires = (datetime.now(timezone.utc) + timedelta(hours=float(ttl))).strftime('%Y-%m-%dT%H:%M:%SZ')
+    except ValueError:
+        pass
 
 entry = {
     'id': str(uuid.uuid4()),
@@ -71,7 +77,7 @@ entry = {
     'from': os.environ['RTP_FROM'],
     'tags': os.environ.get('RTP_TAGS', '').split(',') if os.environ.get('RTP_TAGS') else [],
     'timestamp': os.environ['RTP_TIMESTAMP'],
-    'expires': os.environ.get('RTP_EXPIRES') or None,
+    'expires': expires,
     'deleted': False
 }
 print(json.dumps(entry, ensure_ascii=False))
@@ -84,39 +90,57 @@ PYEOF
     KEY="${1:?Usage: rt-memory.sh get <key>}"
     python3 -c "
 import json, sys
-lines = open('$MEMORY_FILE').readlines()
-for line in reversed(lines):
-    entry = json.loads(line)
-    if entry['key'] == '$KEY' and not entry['deleted']:
+mem_file, key = sys.argv[1], sys.argv[2]
+for line in reversed(open(mem_file).readlines()):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        continue
+    if entry.get('key') == key:
+        # Latest entry wins: a tombstone hides all older revisions
+        if entry.get('deleted'):
+            break
         print(json.dumps(entry, indent=2, ensure_ascii=False))
         sys.exit(0)
-print('Key not found: $KEY', file=sys.stderr)
+print('Key not found: ' + key, file=sys.stderr)
 sys.exit(1)
-"
+" "$MEMORY_FILE" "$KEY"
     ;;
 
   search)
     QUERY="${1:?Usage: rt-memory.sh search <query>}"
     python3 -c "
 import json, sys
-lines = open('$MEMORY_FILE').readlines()
+mem_file, query = sys.argv[1], sys.argv[2]
 seen = set()
 results = []
-for line in reversed(lines):
-    entry = json.loads(line)
-    if entry['deleted'] or entry['key'] in seen:
+for line in reversed(open(mem_file).readlines()):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        continue
+    if entry.get('key') in seen:
         continue
     seen.add(entry['key'])
+    # Latest entry wins: a tombstone hides all older revisions of the key
+    if entry.get('deleted'):
+        continue
     haystack = entry['key'] + ' ' + str(entry.get('value', '')) + ' ' + ' '.join(entry.get('tags', []))
-    if '$QUERY'.lower() in haystack.lower():
+    if query.lower() in haystack.lower():
         results.append(entry)
 for r in results:
     print(json.dumps(r, indent=2, ensure_ascii=False))
     print('---')
 if not results:
-    print('No results for: $QUERY', file=sys.stderr)
+    print('No results for: ' + query, file=sys.stderr)
     sys.exit(1)
-"
+" "$MEMORY_FILE" "$QUERY"
     ;;
 
   list)
@@ -134,61 +158,74 @@ if not results:
 import json, sys
 from datetime import datetime, timezone, timedelta
 
-lines = open('$MEMORY_FILE').readlines()
+mem_file, agent, tag, recent = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 seen = set()
 results = []
 cutoff = None
-if '$RECENT':
+if recent:
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=int('$RECENT'))
-    except: pass
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=float(recent))
+    except ValueError:
+        pass
 
-for line in reversed(lines):
-    entry = json.loads(line)
-    if entry['deleted'] or entry['key'] in seen:
+for line in reversed(open(mem_file).readlines()):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        continue
+    if entry.get('key') in seen:
         continue
     seen.add(entry['key'])
-    if '$AGENT' and entry['from'] != '$AGENT':
+    # Latest entry wins: a tombstone hides all older revisions of the key
+    if entry.get('deleted'):
         continue
-    if '$TAG' and '$TAG' not in entry.get('tags', []):
+    if agent and entry.get('from') != agent:
+        continue
+    if tag and tag not in entry.get('tags', []):
         continue
     if cutoff:
         try:
             ts = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
             if ts < cutoff:
                 continue
-        except: pass
+        except (KeyError, ValueError):
+            pass
     if entry.get('expires'):
         try:
             exp = datetime.fromisoformat(entry['expires'].replace('Z', '+00:00'))
             if exp < datetime.now(timezone.utc):
                 continue
-        except: pass
+        except ValueError:
+            pass
     results.append(entry)
 
 for r in results:
     print('{:40s} | from: {:10s} | {}'.format(r['key'], r['from'], r['timestamp'][:16]))
 if not results:
     print('(empty)')
-"
+" "$MEMORY_FILE" "$AGENT" "$TAG" "$RECENT"
     ;;
 
   delete)
     KEY="${1:?Usage: rt-memory.sh delete <key>}"
+    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     python3 -c "
-import json, uuid
+import json, sys, uuid
 entry = {
     'id': str(uuid.uuid4()),
-    'key': '$KEY',
+    'key': sys.argv[1],
     'value': '__DELETED__',
     'from': 'system',
     'tags': [],
-    'timestamp': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'timestamp': sys.argv[2],
     'expires': None,
     'deleted': True
 }
 print(json.dumps(entry, ensure_ascii=False))
-" >> "$MEMORY_FILE"
+" "$KEY" "$TIMESTAMP" >> "$MEMORY_FILE"
     echo "Deleted: $KEY"
     ;;
 
@@ -208,34 +245,45 @@ print(json.dumps(entry, ensure_ascii=False))
     fi
 
     python3 -c "
-import json, sys
+import json, os, sys, tempfile
 from datetime import datetime, timezone, timedelta
 
-lines = open('$MEMORY_FILE').readlines()
+mem_file, agent, older = sys.argv[1], sys.argv[2], sys.argv[3]
 count = 0
 new_lines = []
-for line in lines:
-    entry = json.loads(line)
+for line in open(mem_file):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        new_lines.append(line)
+        continue
     should_delete = False
-    if '$AGENT' and entry['from'] == '$AGENT' and not entry['deleted']:
+    if agent and entry.get('from') == agent and not entry.get('deleted'):
         should_delete = True
-    if '$OLDER':
+    if older:
         try:
             ts = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=int('$OLDER'))
-            if ts < cutoff and not entry['deleted']:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=float(older))
+            if ts < cutoff and not entry.get('deleted'):
                 should_delete = True
-        except: pass
+        except (KeyError, ValueError):
+            pass
     if should_delete:
         entry['deleted'] = True
         count += 1
     new_lines.append(json.dumps(entry, ensure_ascii=False))
 
-with open('$MEMORY_FILE', 'w') as f:
+# Atomic rewrite: temp file in same dir, then rename
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(mem_file), prefix='.memory.tmp.')
+with os.fdopen(fd, 'w') as f:
     for line in new_lines:
         f.write(line + '\n')
+os.replace(tmp, mem_file)
 print(f'Marked {count} entries as deleted')
-"
+" "$MEMORY_FILE" "$AGENT" "$OLDER"
     ;;
 
   *)

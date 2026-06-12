@@ -239,34 +239,92 @@ const AGENTS = [
   { id: 'lancelot', name: 'LANCELOT', role: 'Guardian',   c: 'lancelot' }
 ];
 
-const STATUS = {
+// Demo data — shown until live data from .dashboard/*.json loads
+const DEMO_STATUS = {
   arthur:   { status: 'working', task: 'Strategic planning for v2',  progress: '2/4 phases', blockers: [] },
   merlin:   { status: 'working', task: 'Research: AI agent frameworks', progress: '3/5 sources', blockers: [] },
   percival: { status: 'working', task: 'CrewAI POC scaffold',       progress: '4/7 modules', blockers: [] },
   bedivere: { status: 'done',    task: 'CrewAI architecture docs',  progress: 'Complete',   blockers: [] },
   lancelot: { status: 'working', task: 'QA: Protocol tests',        progress: '4/7 tests',  blockers: [] }
-];
+};
 
-const MSGS = [
+const DEMO_MSGS = [
   { from: 'lancelot', to: 'percival',  type: 'finding',   prio: 'normal', time: '13:14', txt: 'Tests pass, no issues' },
   { from: 'merlin',   to: 'bedivere',  type: 'finding',   prio: 'normal', time: '13:12', txt: 'CrewAI has best role-based coordination model' },
   { from: 'bedivere', to: 'percival',  type: 'question',  prio: 'normal', time: '13:12', txt: 'Can you build a CrewAI POC by Thursday?' },
   { from: 'percival', to: 'bedivere',  type: 'accept',    prio: 'normal', time: '13:12', txt: 'Thursday EOD' },
   { from: 'lancelot', to: 'arthur',    type: 'status',    prio: 'normal', time: '13:12', txt: 'QA: 4/7 tests passing' },
-  { from: 'percival', to: 'arthur',    type: 'artifact',  prio: 'normal', time: '13:12', txt: 'CrewAI scaffold → /tmp/crewai-scaffold.js' },
+  { from: 'percival', to: 'arthur',    type: 'artifact',  prio: 'normal', time: '13:12', txt: 'CrewAI scaffold -> /tmp/crewai-scaffold.js' },
   { from: 'arthur',   to: 'merlin',    type: 'offer',     prio: 'high',  time: '13:12', txt: 'Research AI agent frameworks' },
   { from: 'merlin',   to: 'arthur',    type: 'accept',    prio: 'high',  time: '13:12', txt: '15 minutes' }
 ];
 
-const MEM = [
+const DEMO_MEM = [
   { k: 'arch.framework',  v: 'CrewAI chosen for multi-agent coordination', f: 'arthur' },
   { k: 'research.top3',   v: 'CrewAI, AutoGen, LangGraph', f: 'merlin' }
 ];
 
+let STATUS = DEMO_STATUS;
+let MSGS = DEMO_MSGS;
+let MEM = DEMO_MEM;
+let live = false;
+
+// All dynamic strings pass through esc() before hitting innerHTML
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function payloadText(p) {
+  if (p == null) return '';
+  if (typeof p === 'string') return p;
+  return Object.values(p).filter(v => typeof v === 'string').join(' · ') || JSON.stringify(p);
+}
+
+async function fetchJSON(path) {
+  const r = await fetch(path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function refresh() {
+  try {
+    const [msgs, mem, status] = await Promise.all([
+      fetchJSON('.dashboard/messages.json'),
+      fetchJSON('.dashboard/memory.json'),
+      fetchJSON('.dashboard/status.json').catch(() => [])
+    ]);
+    MSGS = msgs.map(m => ({
+      from: m.from || '?', to: m.to || '?', type: m.type || '',
+      prio: m.priority || 'normal',
+      time: (m.timestamp || '').slice(11, 16),
+      txt: payloadText(m.payload)
+    }));
+    MEM = mem.map(e => ({ k: e.key, v: typeof e.value === 'string' ? e.value : JSON.stringify(e.value), f: e.from }));
+    STATUS = {};
+    for (const s of status) {
+      STATUS[s.agent] = {
+        status: s.status || 'idle',
+        task: s.current_task || '',
+        progress: s.progress || '',
+        blockers: s.blockers || []
+      };
+    }
+    live = true;
+  } catch (e) {
+    // No live data (file:// or missing files) — keep demo data
+  }
+  render();
+}
+
 function render() {
+  const pill = document.querySelector('.status-pill');
+  if (pill) pill.lastChild.textContent = live ? ' Live' : ' Demo';
+
   const active = Object.values(STATUS).filter(s => s.status === 'working').length;
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Agents</div></div>
+    <div class="stat"><div class="stat-num">${AGENTS.length}</div><div class="stat-label">Agents</div></div>
     <div class="stat"><div class="stat-num" style="color:var(--green)">${active}</div><div class="stat-label">Active</div></div>
     <div class="stat"><div class="stat-num">${MSGS.length}</div><div class="stat-label">Messages</div></div>
     <div class="stat"><div class="stat-num" style="color:var(--gold)">${MEM.length}</div><div class="stat-label">Memory</div></div>
@@ -277,23 +335,27 @@ function render() {
     const s = STATUS[a.id] || { status: 'idle', task: '', progress: '', blockers: [] };
     const has = s.task && s.task !== 'Initializing';
     let pct = '0%';
-    const m = s.progress && s.progress.match(/(\d+)\/(\d+)/);
+    const m = s.progress && s.progress.match(/(\d+)\s*(?:\/|of)\s*(\d+)/);
     if (m) pct = Math.round(parseInt(m[1]) / parseInt(m[2]) * 100) + '%';
     else if (s.status === 'done' || s.progress === 'Complete') pct = '100%';
-    const bl = s.blockers.length ? `<div class="blocker">⚠ ${s.blockers[0]}</div>` : '';
+    const badge = ['working','idle','blocked','done'].includes(s.status) ? s.status : 'idle';
+    const bl = s.blockers.length ? `<div class="blocker">⚠ ${esc(s.blockers[0])}</div>` : '';
     const bf = a.c === 'arthur' ? 'gold' : a.c === 'merlin' ? 'blue' : a.c === 'percival' ? 'green' : a.c === 'bedivere' ? 'warm' : 'red';
-    cards += `<div class="card"><div class="card-head"><div><div class="card-name">${a.name}</div><div class="card-role">${a.role}</div></div><span class="badge badge-${s.status}">${s.status}</span></div><div class="${has?'card-task active':'card-task'}">${has?s.task:'Standing by'}</div>${s.progress?`<div class="bar"><div class="bar-fill ${bf}" style="width:${pct}"></div></div>`:''}${bl}<div class="card-footer">${MSGS.filter(m=>m.to===a.id||m.to==='broadcast').length} messages</div></div>`;
+    cards += `<div class="card"><div class="card-head"><div><div class="card-name">${a.name}</div><div class="card-role">${a.role}</div></div><span class="badge badge-${badge}">${esc(s.status)}</span></div><div class="${has?'card-task active':'card-task'}">${has?esc(s.task):'Standing by'}</div>${s.progress?`<div class="bar"><div class="bar-fill ${bf}" style="width:${pct}"></div></div>`:''}${bl}<div class="card-footer">${MSGS.filter(m=>m.to===a.id||m.to==='broadcast').length} messages</div></div>`;
   }
   document.getElementById('agents').innerHTML = cards;
 
   const sorted = [...MSGS].sort((a,b) => b.time.localeCompare(a.time));
-  document.getElementById('msgs').innerHTML = sorted.map(m => `<div class="msg-item"><span class="msg-from">${m.from.substring(0,6).toUpperCase()}</span><span class="msg-arrow">→</span><span class="msg-to">${m.to.substring(0,6).toUpperCase()}</span><span class="msg-type">${m.type}</span><span class="msg-text">${m.txt}</span><span class="msg-time">${m.time}</span><span class="msg-prio ${m.prio==='high'?'high':'norm'}">${m.prio}</span></div>`).join('') || '<div class="empty">No messages</div>';
+  document.getElementById('msgs').innerHTML = sorted.map(m => `<div class="msg-item"><span class="msg-from">${esc(m.from.substring(0,6).toUpperCase())}</span><span class="msg-arrow">→</span><span class="msg-to">${esc(m.to.substring(0,6).toUpperCase())}</span><span class="msg-type">${esc(m.type)}</span><span class="msg-text">${esc(m.txt)}</span><span class="msg-time">${esc(m.time)}</span><span class="msg-prio ${m.prio==='high'||m.prio==='urgent'?'high':'norm'}">${esc(m.prio)}</span></div>`).join('') || '<div class="empty">No messages</div>';
 
-  document.getElementById('mems').innerHTML = MEM.map(m => `<div class="mem-item"><span class="mem-key">${m.k}</span><span class="mem-val">${m.v}</span><span class="mem-from">${m.f}</span></div>`).join('') || '<div class="empty">No memory</div>';
+  document.getElementById('mems').innerHTML = MEM.map(m => `<div class="mem-item"><span class="mem-key">${esc(m.k)}</span><span class="mem-val">${esc(m.v)}</span><span class="mem-from">${esc(m.f)}</span></div>`).join('') || '<div class="empty">No memory</div>';
 
   document.getElementById('total').textContent = `${MSGS.length} messages`;
 }
+
 render();
+refresh();
+setInterval(refresh, 5000);
 </script>
 </body>
 </html>
