@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "project_path": "/Users/arielkurek/Desktop/Ari/round-table-protocol",
-  "task": "test, fix and improve — 3 iteration loops",
+  "task": "test, fix and improve — 3 iteration loops + Hermes.app integration",
   "options": {
     "max_cycles": 3,
     "converge_after": 2,
@@ -16,7 +16,7 @@
   "budget": {
     "cycles_used": 3,
     "subagent_runs": 0,
-    "wall_minutes": 12.0,
+    "wall_minutes": 20.0,
     "started_at": "2026-06-13T16:30:00+00:00"
   },
   "current_cycle": 3,
