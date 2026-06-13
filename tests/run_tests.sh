@@ -163,6 +163,30 @@ run "status: invalid status rejected" 1 "$SCRIPTS/rt-status.sh" lancelot --task 
 run "checkin: runs" 0 "$SCRIPTS/rt-checkin.sh" lancelot
 assert_contains "checkin: shows status" "lancelot"
 
+### rt-session-checkin ####################################################
+# Clean inbox of merlin first
+rm -f "$ROUND_TABLE_DIR/inbox/merlin/"*.json 2>/dev/null || true
+rm -f "$ROUND_TABLE_DIR/.checkin-state-merlin" 2>/dev/null || true
+
+run "session-checkin: empty inbox" 0 "$SCRIPTS/rt-session-checkin.sh" merlin
+assert_contains "session-checkin: empty checkin output" ""
+
+# Send a normal message
+"$SCRIPTS/rt-send.sh" --from arthur --to merlin --type status --payload '{"s":"ok"}' >/dev/null
+run "session-checkin: 1 pending" 0 "$SCRIPTS/rt-session-checkin.sh" merlin
+assert_contains "session-checkin: shows 1 pending" "1 pending (0 urgent)"
+
+# Repeat run should be silent
+run "session-checkin: repeat run silent" 0 "$SCRIPTS/rt-session-checkin.sh" merlin
+assert_contains "session-checkin: repeat checkin output empty" ""
+
+# Send an urgent message
+"$SCRIPTS/rt-send.sh" --from arthur --to merlin --type question --priority urgent --payload '{"q":"help"}' >/dev/null
+run "session-checkin: urgent pending" 0 "$SCRIPTS/rt-session-checkin.sh" merlin
+assert_contains "session-checkin: shows urgent" "2 pending (1 urgent)"
+assert_contains "session-checkin: shows urgent details" "FROM: arthur  TYPE: question"
+
+
 ### rt-snapshot ###########################################################
 run "snapshot: save" 0 "$SCRIPTS/rt-snapshot.sh" merlin sess-42 "research done"
 SNAP_FILE=$(ls "$ROUND_TABLE_DIR/snapshots/"*.json 2>/dev/null | head -1)
@@ -312,6 +336,13 @@ assert_contains "dashboard text: shows header" "ROUND TABLE"
 assert_contains "dashboard text: shows agent" "LANCELOT"
 # must never reference opening a browser, only the passive URL
 assert_not_contains "dashboard text: no browser open" "open http"
+
+### ensure-dashboard #######################################################
+cp "$SCRIPTS/generate-dashboard-data.sh" "$ROUND_TABLE_DIR/generate-dashboard-data.sh"
+chmod +x "$ROUND_TABLE_DIR/generate-dashboard-data.sh"
+run "ensure-dashboard: runs" 0 "$SCRIPTS/ensure-dashboard.sh"
+assert_file "ensure-dashboard: cron.log created" "$ROUND_TABLE_DIR/.dashboard/cron.log"
+
 
 ### rt-dispatch + rt-devloop (stubbed hermes — no real model calls) #######
 STUB_BIN="$SANDBOX/bin"
