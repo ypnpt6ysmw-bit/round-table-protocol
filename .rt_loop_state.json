@@ -14,14 +14,14 @@
     "review_only": false
   },
   "budget": {
-    "cycles_used": 0,
+    "cycles_used": 3,
     "subagent_runs": 0,
-    "wall_minutes": 0.0,
+    "wall_minutes": 12.0,
     "started_at": "2026-06-13T16:30:00+00:00"
   },
-  "current_cycle": 0,
-  "converged": false,
-  "done": false,
+  "current_cycle": 3,
+  "converged": true,
+  "done": true,
   "consecutive_no_progress": 0,
   "git_branch": "rt-loop/2026-06-13-three-loops",
   "all_issues": [],
