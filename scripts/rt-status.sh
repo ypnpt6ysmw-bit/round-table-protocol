@@ -41,6 +41,8 @@ export RTP_TIMESTAMP="$TIMESTAMP"
 STATUS_DIR="$ROUND_TABLE_DIR/status"
 mkdir -p "$STATUS_DIR"
 TMP_FILE=$(mktemp "$STATUS_DIR/.${AGENT}.tmp.XXXXXX")
+cleanup_tmp() { rm -f "$TMP_FILE"; }
+trap cleanup_tmp EXIT
 
 python3 << 'PYEOF' > "$TMP_FILE"
 import json, os

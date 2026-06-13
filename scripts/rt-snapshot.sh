@@ -27,6 +27,8 @@ export RTP_TIMESTAMP="$TIMESTAMP"
 SNAP_DIR="$ROUND_TABLE_DIR/snapshots"
 mkdir -p "$SNAP_DIR"
 TMP_FILE=$(mktemp "$SNAP_DIR/.${SNAPSHOT_ID}.tmp.XXXXXX")
+cleanup_tmp() { rm -f "$TMP_FILE"; }
+trap cleanup_tmp EXIT
 
 python3 << 'PYEOF' > "$TMP_FILE"
 import json, os

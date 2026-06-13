@@ -46,6 +46,10 @@ if [[ -n "$KEEP_LAST" && ! "$KEEP_LAST" =~ ^[0-9]+$ ]]; then
 fi
 
 file_age_secs() {
+  if [[ ! -e "$1" ]]; then
+    echo -1
+    return
+  fi
   if [[ "$(uname)" == "Darwin" ]]; then
     echo $(( $(date +%s) - $(stat -f %m "$1") ))
   else

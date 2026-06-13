@@ -44,6 +44,8 @@ export RTP_TIMESTAMP="$TIMESTAMP"
 ART_DIR="$ROUND_TABLE_DIR/artifacts"
 mkdir -p "$ART_DIR"
 TMP_FILE=$(mktemp "$ART_DIR/.${ARTIFACT_ID}.tmp.XXXXXX")
+cleanup_tmp() { rm -f "$TMP_FILE"; }
+trap cleanup_tmp EXIT
 
 python3 << 'PYEOF' > "$TMP_FILE"
 import json, os

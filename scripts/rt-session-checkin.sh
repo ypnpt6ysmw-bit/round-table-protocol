@@ -63,6 +63,8 @@ fi
 
 # Save state (atomic write: temp file then mv to prevent race conditions)
 tmp_state=$(mktemp "$RT_DIR/.checkin-state-${AGENT}.tmp.XXXXXX")
+cleanup_tmp() { rm -f "$tmp_state"; }
+trap cleanup_tmp EXIT
 date +%s > "$tmp_state"
 echo "$PENDING" >> "$tmp_state"
 mv "$tmp_state" "$STATE_FILE"

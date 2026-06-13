@@ -56,6 +56,8 @@ TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Write payload to temp file so Python can read it without stdin conflicts
 PAYLOAD_FILE=$(mktemp "${TMPDIR:-/tmp}/rtp_payload.XXXXXX")
+cleanup_payload() { rm -f "$PAYLOAD_FILE"; }
+trap cleanup_payload EXIT
 printf '%s' "$PAYLOAD" > "$PAYLOAD_FILE"
 
 export RTP_MSG_ID="$MSG_ID"
@@ -100,8 +102,7 @@ envelope = {
 print(json.dumps(envelope, indent=2, ensure_ascii=False))
 PYEOF
 )
-
-rm -f "$PAYLOAD_FILE"
+# PAYLOAD_FILE cleaned up by EXIT trap
 
 # Write to outbox
 OUTBOX_DIR="$ROUND_TABLE_DIR/outbox/$FROM"

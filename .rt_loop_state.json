@@ -1,9 +1,9 @@
 {
   "version": "2.0",
   "project_path": "/Users/arielkurek/Desktop/Ari/round-table-protocol",
-  "task": "test, fix and improve",
+  "task": "test, fix and improve — 3 iteration loops",
   "options": {
-    "max_cycles": 5,
+    "max_cycles": 3,
     "converge_after": 2,
     "max_minutes": 60,
     "max_issues_per_cycle": 5,
@@ -17,13 +17,13 @@
     "cycles_used": 0,
     "subagent_runs": 0,
     "wall_minutes": 0.0,
-    "started_at": "2026-06-13T16:10:00+00:00"
+    "started_at": "2026-06-13T16:30:00+00:00"
   },
   "current_cycle": 0,
   "converged": false,
   "done": false,
   "consecutive_no_progress": 0,
-  "git_branch": "rt-loop/2026-06-13-test-fix-improve",
+  "git_branch": "rt-loop/2026-06-13-three-loops",
   "all_issues": [],
   "resolved_issues": [],
   "reappearing_issues": [],
