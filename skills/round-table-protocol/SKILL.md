@@ -67,7 +67,13 @@ rt-artifact.sh <agent> --file <path> --desc <desc> [--for <agent>]
 rt-watch.sh [--follow]
 rt-daemon.sh start|stop|status
 rt-cleanup.sh --older-than <hours> [--dry-run]
+rt-dashboard-text.sh              # print live dashboard as chat-friendly text
 ```
+
+The web dashboard (http://localhost:8101/dashboard.html) is headless and never
+auto-opens. To show it **inside a Hermes chat**, run `rt-dashboard-text.sh` and
+post its output — it refreshes live data, then prints agents, recent messages,
+and shared memory as a compact status board.
 
 ### Dispatch — real agent delivery
 ```
