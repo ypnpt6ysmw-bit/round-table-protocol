@@ -6,7 +6,7 @@
 # With --follow:    tail -f style monitoring (checks every 2s)
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 CONFIG="$ROUND_TABLE_DIR/config.json"
 FOLLOW=0
 AGENT=""

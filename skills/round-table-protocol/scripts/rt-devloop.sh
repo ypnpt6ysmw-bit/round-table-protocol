@@ -29,6 +29,7 @@ set -euo pipefail
 _REAL_USER_HOME="$(eval echo ~"$(whoami)")"
 
 ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+CONFIG="$ROUND_TABLE_DIR/config.json"
 HERMES_BIN="${HERMES_BIN:-hermes}"
 TIMEOUT_SECS="${RT_PHASE_TIMEOUT:-900}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -87,9 +88,27 @@ printf '%s\n' "$TASK" > "$RUN_DIR/task.txt"
 build_phase_prompt() {  # build_phase_prompt <phase>
   local phase="$1" agent
   agent=$(phase_agent "$1")
+
+  # Read role info from config.json
+  local role_info
+  role_info=$(python3 -c "
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[1]))
+    roles = cfg.get('roles', {})
+    r = roles.get(sys.argv[2], {})
+    caps = ', '.join(r.get('capabilities', []))
+    print('Role:', r.get('title', 'Unknown'))
+    print('Your capabilities:', caps)
+except Exception:
+    pass
+" "$CONFIG" "$agent" 2>/dev/null || true)
+
   cat <<PROMPT
 You are $(upper "$agent"), a knight of the Round Table (role per your SOUL.md).
 You are running the $(upper "$phase") phase of a Round Table development loop.
+
+${role_info}
 
 ## Task
 $TASK

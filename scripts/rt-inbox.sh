@@ -3,7 +3,7 @@
 # Usage: rt-inbox.sh <agent> list|read <id>|ack <id>
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 ACTION="list"
 AGENT=""
 MSG_ID=""

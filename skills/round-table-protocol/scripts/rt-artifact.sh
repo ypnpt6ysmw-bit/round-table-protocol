@@ -3,7 +3,7 @@
 # Usage: rt-artifact.sh <agent> --file <path> --description <desc> [--for <agent>] [--context <ctx>] [--status <draft|complete|superseded>]
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 
 AGENT="${1:?Usage: rt-artifact.sh <agent> --file <path> --description <desc>}"
 shift

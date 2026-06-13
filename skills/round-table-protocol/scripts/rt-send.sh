@@ -3,7 +3,7 @@
 # Usage: rt-send.sh --from <agent> --to <agent|broadcast> --type <type> --priority <level> --payload '<json>'
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 CONFIG="$ROUND_TABLE_DIR/config.json"
 
 FROM=""

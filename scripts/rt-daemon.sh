@@ -7,7 +7,7 @@
 # Falls back to polling if no file watcher is available.
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 PIDFILE="$ROUND_TABLE_DIR/.daemon.pid"
 NOTIFICATIONS="$ROUND_TABLE_DIR/notifications.jsonl"
 LOGFILE="$ROUND_TABLE_DIR/.daemon.log"

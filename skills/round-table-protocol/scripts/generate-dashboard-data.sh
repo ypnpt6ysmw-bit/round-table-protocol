@@ -2,7 +2,7 @@
 # Generate JSON data files for the Round Table dashboard
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 mkdir -p "$ROUND_TABLE_DIR/.dashboard"
 
 RTP_DIR="$ROUND_TABLE_DIR" python3 << 'PYEOF'

@@ -9,8 +9,19 @@ RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Copy dashboard HTML from the skill package to the served directory
-SKILL_DASHBOARD="$SCRIPT_DIR/../dashboard.html"
-if [[ -f "$SKILL_DASHBOARD" ]]; then
+# Try multiple locations since the script may be run from project or skill dir
+SKILL_DASHBOARD=""
+for candidate in \
+  "$SCRIPT_DIR/../skills/round-table-protocol/dashboard.html" \
+  "$SCRIPT_DIR/../dashboard.html" \
+  "$SCRIPT_DIR/dashboard.html" \
+  "$RT_DIR/dashboard.html"; do
+  if [[ -f "$candidate" ]]; then
+    SKILL_DASHBOARD="$candidate"
+    break
+  fi
+done
+if [[ -n "$SKILL_DASHBOARD" ]]; then
   cp "$SKILL_DASHBOARD" "$RT_DIR/dashboard.html"
 fi
 
@@ -20,4 +31,4 @@ if ! lsof -ti tcp:8101 >/dev/null 2>&1; then
   disown 2>/dev/null || true
 fi
 
-"$RT_DIR/generate-dashboard-data.sh" >> "$RT_DIR/.dashboard/cron.log" 2>&1
+"$SCRIPT_DIR/generate-dashboard-data.sh" >> "$RT_DIR/.dashboard/cron.log" 2>&1

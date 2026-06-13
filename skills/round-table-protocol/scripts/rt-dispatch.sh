@@ -106,10 +106,30 @@ build_prompt() {  # build_prompt <agent> <msg id list...>
   local rt="$ROUND_TABLE_DIR"
   local agent_uc
   agent_uc=$(printf '%s' "$agent" | tr '[:lower:]' '[:upper:]')
+
+  # Read role info from config.json
+  local role_info
+  role_info=$(python3 -c "
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[1]))
+    roles = cfg.get('roles', {})
+    r = roles.get(sys.argv[2], {})
+    caps = ', '.join(r.get('capabilities', []))
+    accepts = ', '.join(r.get('accepts_types', []))
+    print(f\"Role: {r.get('title', 'Unknown')}\")
+    print(f\"Your capabilities: {caps}\")
+    print(f\"Message types you accept: {accepts}\")
+except Exception as e:
+    print(f'Role: {sys.argv[2]}')
+" "$CONFIG" "$agent" 2>/dev/null || echo "Role: $agent_uc")
+
   cat <<PROMPT
 You are ${agent_uc}, a knight of the Round Table multi-agent system. Your role
 and personality are defined in your SOUL.md. You have $# unread Round Table
 message(s) waiting.
+
+${role_info}
 
 Protocol scripts (run with bash, ROUND_TABLE_DIR=$rt is already set):
   $SCRIPT_DIR/rt-inbox.sh $agent list
@@ -123,10 +143,15 @@ Unread message ids: $*
 
 For EACH message, in order:
 1. Read it: rt-inbox.sh $agent read <id>
-2. Act on it according to your role. Questions and task-offers expect a reply:
-   send one with rt-send.sh (use --reply-to '<id>'). Findings/status updates
-   may just need acknowledgment. Do real work when a task is actionable now;
-   if it is too large for this session, reply with a plan and what you need.
+2. Act on it according to your role:
+   - If the task MATCHES your capabilities: do the work, send a reply.
+   - If the task DOES NOT MATCH your role: send a task-reject reply with
+     {"reason": "not_my_role", "suggested_agent": "<who_should_handle_this>"}
+     Use rt-send.sh --type task-reject to the original sender.
+   Questions and task-offers expect a reply: send one with rt-send.sh
+   (use --reply-to '<id>'). Findings/status updates may just need
+   acknowledgment. Do real work when a task is actionable now; if it is
+   too large for this session, reply with a plan and what you need.
 3. Acknowledge it: rt-inbox.sh $agent ack <id>
 
 When done: update your status card with rt-status.sh, and store any durable
@@ -201,7 +226,65 @@ dispatch_agent() {  # dispatch_agent <agent> -> spawn real profile session
   else
     log "$agent: session FAILED (exit $rc) after ${dur}s — see $agent_log"
   fi
+
+  # Check for task-reject messages in the agent's outbox and re-route
+  handle_rejects "$agent"
   return 0
+}
+
+handle_rejects() {  # handle_rejects <agent> — scan outbox for task-reject, re-route
+  local agent="$1"
+  local outbox="$ROUND_TABLE_DIR/outbox/$agent"
+  [[ ! -d "$outbox" ]] && return 0
+
+  shopt -s nullglob
+  local files=("$outbox"/*.json)
+  shopt -u nullglob
+  [[ ${#files[@]} -eq 0 ]] && return 0
+
+  local f
+  for f in "${files[@]+"${files[@]}"}"; do
+    python3 -c '
+import json, os, sys
+try:
+    msg = json.load(open(sys.argv[1]))
+    if msg.get("type") == "task-reject":
+        payload = msg.get("payload", {})
+        suggested = payload.get("suggested_agent", "")
+        # Reject was sent TO the original sender
+        # Original message is in sender outbox at msg["to"]
+        original_sender = msg.get("to", "")
+        reason = payload.get("reason", "unknown")
+        reply_to = msg.get("reply_to", "")
+        # msg_id of the reject itself (for logging)
+        msg_id = msg.get("id", "")
+        print(f"REJECT|{suggested}|{original_sender}|{reason}|{reply_to}|{msg_id}")
+except (ValueError, OSError):
+    pass
+' "$f" 2>/dev/null | while IFS='|' read -r _ suggested original_sender reason reply_to msg_id; do
+      [[ -z "$suggested" ]] && continue
+      log "$agent: task-reject (reason: $reason, reply_to: $reply_to) — re-routing to $suggested"
+      # Find the original message in the sender's outbox by reply_to id
+      # Fall back to scanning all files in sender's outbox for the one with matching reply_to
+      local orig_msg=""
+      if [[ -n "$reply_to" ]]; then
+        orig_msg="$ROUND_TABLE_DIR/outbox/$original_sender/${reply_to}.json"
+      fi
+      # If not found by reply_to, try the reject's own id (same as original in simple cases)
+      if [[ -z "$orig_msg" || ! -f "$orig_msg" ]]; then
+        orig_msg="$ROUND_TABLE_DIR/outbox/$original_sender/${msg_id}.json"
+      fi
+      if [[ -f "$orig_msg" ]]; then
+        local inbox_dir="$ROUND_TABLE_DIR/inbox/$suggested"
+        mkdir -p "$inbox_dir"
+        local tmp
+        tmp=$(mktemp "$inbox_dir/.reroute.XXXXXX")
+        cp "$orig_msg" "$tmp"
+        mv "$tmp" "$inbox_dir/$(basename "$f" .json).json"
+        log "$agent: re-routed message to $suggested inbox"
+      fi
+    done
+  done
 }
 
 pass_once() {

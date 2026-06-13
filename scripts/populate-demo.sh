@@ -2,7 +2,7 @@
 # Populate Round Table with demo data for dashboard visualization
 set -euo pipefail
 
-RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+RT_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 mkdir -p "$RT_DIR/status"
 
 # Status files

@@ -14,7 +14,7 @@
 # All user-supplied values reach Python via argv/env — never via source interpolation.
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 MEMORY_FILE="$ROUND_TABLE_DIR/memory.jsonl"
 
 mkdir -p "$ROUND_TABLE_DIR"

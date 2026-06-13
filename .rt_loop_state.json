@@ -1,11 +1,11 @@
 {
   "version": "2.0",
   "project_path": "/Users/arielkurek/Desktop/Ari/round-table-protocol",
-  "task": "Full pipeline audit: analyze, research, fix, test, and improve the Round Table Protocol for seamless Hermes.app integration",
+  "task": "Full pipeline dev loop: analyze, research, plan, fix, test, and improve the Round Table Protocol for seamless Hermes.app integration. Highest effort.",
   "options": {
     "max_cycles": 3,
     "converge_after": 2,
-    "max_minutes": 90,
+    "max_minutes": 120,
     "max_issues_per_cycle": 5,
     "auto": true,
     "no_verify": false,
@@ -17,13 +17,13 @@
     "cycles_used": 0,
     "subagent_runs": 0,
     "wall_minutes": 0,
-    "started_at": "2026-06-13T20:15:00+00:00"
+    "started_at": "2026-06-13T20:20:00+00:00"
   },
-  "current_cycle": 0,
+  "current_cycle": 1,
   "converged": false,
   "done": false,
   "consecutive_no_progress": 0,
-  "git_branch": "rt-loop/2026-06-13-pipeline-audit",
+  "git_branch": "rt-loop/2026-06-13-full-pipeline",
   "all_issues": [],
   "resolved_issues": [],
   "reappearing_issues": [],

@@ -29,6 +29,7 @@ set -euo pipefail
 _REAL_USER_HOME="$(eval echo ~"$(whoami)")"
 
 ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+CONFIG="$ROUND_TABLE_DIR/config.json"
 HERMES_BIN="${HERMES_BIN:-hermes}"
 TIMEOUT_SECS="${RT_PHASE_TIMEOUT:-900}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

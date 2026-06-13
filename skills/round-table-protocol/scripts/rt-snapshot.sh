@@ -3,7 +3,7 @@
 # Usage: rt-snapshot.sh <agent> <session_id> <summary>
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 
 AGENT="${1:?Usage: rt-snapshot.sh <agent> <session_id> <summary>}"
 SESSION_ID="${2:?Usage: rt-snapshot.sh <agent> <session_id> <summary>}"

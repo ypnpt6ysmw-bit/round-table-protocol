@@ -8,7 +8,7 @@
 # Memory vacuum (drop tombstoned entries) always runs unless --dry-run.
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 DRY_RUN=0
 OLDER_THAN=""
 KEEP_LAST=""

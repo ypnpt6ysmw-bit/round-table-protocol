@@ -251,17 +251,29 @@ try:
     if msg.get("type") == "task-reject":
         payload = msg.get("payload", {})
         suggested = payload.get("suggested_agent", "")
-        original_to = msg.get("to", "")
+        # Reject was sent TO the original sender
+        # Original message is in sender outbox at msg["to"]
+        original_sender = msg.get("to", "")
         reason = payload.get("reason", "unknown")
         reply_to = msg.get("reply_to", "")
-        print(f"REJECT|{suggested}|{original_to}|{reason}|{reply_to}")
+        # msg_id of the reject itself (for logging)
+        msg_id = msg.get("id", "")
+        print(f"REJECT|{suggested}|{original_sender}|{reason}|{reply_to}|{msg_id}")
 except (ValueError, OSError):
     pass
-' "$f" 2>/dev/null | while IFS='|' read -r _ suggested original_to reason reply_to; do
+' "$f" 2>/dev/null | while IFS='|' read -r _ suggested original_sender reason reply_to msg_id; do
       [[ -z "$suggested" ]] && continue
-      log "$agent: task-reject (reason: $reason) — re-routing to $suggested"
-      # Re-send the original message to the suggested agent
-      local orig_msg="$ROUND_TABLE_DIR/outbox/$original_to/$(basename "$f" .json).json"
+      log "$agent: task-reject (reason: $reason, reply_to: $reply_to) — re-routing to $suggested"
+      # Find the original message in the sender's outbox by reply_to id
+      # Fall back to scanning all files in sender's outbox for the one with matching reply_to
+      local orig_msg=""
+      if [[ -n "$reply_to" ]]; then
+        orig_msg="$ROUND_TABLE_DIR/outbox/$original_sender/${reply_to}.json"
+      fi
+      # If not found by reply_to, try the reject's own id (same as original in simple cases)
+      if [[ -z "$orig_msg" || ! -f "$orig_msg" ]]; then
+        orig_msg="$ROUND_TABLE_DIR/outbox/$original_sender/${msg_id}.json"
+      fi
       if [[ -f "$orig_msg" ]]; then
         local inbox_dir="$ROUND_TABLE_DIR/inbox/$suggested"
         mkdir -p "$inbox_dir"
