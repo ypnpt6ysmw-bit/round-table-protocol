@@ -138,6 +138,7 @@ run_phase() {  # run_phase <phase>
   fi
 
   echo "━━━ $(upper "$phase") → $(upper "$agent") (profile: $agent) ━━━"
+  "$SCRIPT_DIR/rt-status.sh" "$agent" --task "devloop $RUN_ID: $phase" --status "working"
   local rc=0
   if command -v timeout >/dev/null 2>&1; then
     ROUND_TABLE_DIR="$ROUND_TABLE_DIR" timeout "$TIMEOUT_SECS" \
@@ -147,12 +148,13 @@ run_phase() {  # run_phase <phase>
       "$HERMES_BIN" -p "$agent" -z "$prompt" > "$out_file" 2>"$RUN_DIR/$phase.err" < /dev/null || rc=$?
   fi
 
-  if [[ $rc -ne 0 ]]; then
-    echo "Phase $phase FAILED (exit $rc) — see $RUN_DIR/$phase.err" >&2
-    return $rc
+  if [[ $rc -eq 0 ]]; then
+    "$SCRIPT_DIR/rt-status.sh" "$agent" --task "devloop $RUN_ID: $phase" --status "done"
+    echo "  output: $out_file ($(wc -l < "$out_file" | tr -d ' ') lines)"
+  else
+    "$SCRIPT_DIR/rt-status.sh" "$agent" --task "devloop $RUN_ID: $phase" --status blocked --blocker "exit $rc"
   fi
-  echo "  output: $out_file ($(wc -l < "$out_file" | tr -d ' ') lines)"
-  return 0
+  return $rc
 }
 
 echo "=== Round Table Dev Loop: $RUN_ID ==="

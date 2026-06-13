@@ -107,6 +107,14 @@ run "send: path traversal rejected" 1 \
 [[ ! -d "$ROUND_TABLE_DIR/evil" && ! -d "$SANDBOX/evil" ]] && PASS=$((PASS+1)) || {
   FAIL=$((FAIL+1)); FAILED_NAMES+=("send: traversal dir not created"); echo "FAIL: traversal dir created"; }
 
+# Verify no temp files leaked to /tmp from rt-send
+run "send: no temp files leaked" 0 bash -c '
+  tmp_before=$(ls /tmp/rtp_payload.* 2>/dev/null | wc -l)
+  '"$SCRIPTS/rt-send.sh"' --from arthur --to merlin --type status --payload '"'"'{"ok":true}"'"'"'
+  tmp_after=$(ls /tmp/rtp_payload.* 2>/dev/null | wc -l)
+  [[ "$tmp_before" -eq "$tmp_after" ]]
+'
+
 ### rt-inbox ##############################################################
 run "inbox: list" 0 "$SCRIPTS/rt-inbox.sh" merlin list
 assert_contains "inbox: list shows message" "question"
