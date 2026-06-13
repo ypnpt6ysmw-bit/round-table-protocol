@@ -304,6 +304,15 @@ assert_file "dashboard data: memory.json" "$ROUND_TABLE_DIR/.dashboard/memory.js
 assert_valid_json "dashboard data: messages valid" "$ROUND_TABLE_DIR/.dashboard/messages.json"
 assert_valid_json "dashboard data: memory valid" "$ROUND_TABLE_DIR/.dashboard/memory.json"
 
+### rt-dashboard-text ######################################################
+"$SCRIPTS/rt-status.sh" lancelot --task "QA board" --status working --progress "2/3" >/dev/null
+"$SCRIPTS/generate-dashboard-data.sh" >/dev/null
+run "dashboard text: renders" 0 "$SCRIPTS/rt-dashboard-text.sh"
+assert_contains "dashboard text: shows header" "ROUND TABLE"
+assert_contains "dashboard text: shows agent" "LANCELOT"
+# must never reference opening a browser, only the passive URL
+assert_not_contains "dashboard text: no browser open" "open http"
+
 ### rt-dispatch + rt-devloop (stubbed hermes — no real model calls) #######
 STUB_BIN="$SANDBOX/bin"
 mkdir -p "$STUB_BIN"
