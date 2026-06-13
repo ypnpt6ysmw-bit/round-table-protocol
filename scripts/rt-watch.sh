@@ -49,16 +49,23 @@ print('  {:12s} | {:10s} | {:50s}'.format(d['agent'], d['status'], d.get('curren
     [[ -n "$AGENT" ]] && [[ "$agent" != "$AGENT" ]] && continue
     inbox="$ROUND_TABLE_DIR/inbox/$agent"
     if [[ -d "$inbox" ]]; then
-      pending=0
-      urgent=0
       shopt -s nullglob
-      for f in "$inbox"/*.json; do
-        pending=$((pending+1))
-        prio=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('priority',''))" "$f" 2>/dev/null || true)
-        [[ "$prio" == "urgent" ]] && urgent=$((urgent+1))
-      done
+      files=("$inbox"/*.json)
       shopt -u nullglob
+      pending=${#files[@]}
       if [[ $pending -gt 0 ]]; then
+        urgent=$(python3 -c '
+import json, sys
+count = 0
+for path in sys.argv[1:]:
+    try:
+        with open(path) as f:
+            if json.load(f).get("priority") == "urgent":
+                count += 1
+    except Exception:
+        pass
+print(count)
+' "${files[@]}")
         echo "  $agent: $pending messages ($urgent urgent)"
       fi
     fi
