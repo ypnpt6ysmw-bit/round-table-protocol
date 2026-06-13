@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Round Table</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #18181f;
+  --border: #222230;
+  --text: #d0ccc4;
+  --text-dim: #6a6a78;
+  --gold: #b8963e;
+  --green: #4a8a6a;
+  --green-dim: rgba(74, 138, 106, 0.15);
+  --red: #8a3a3a;
+  --red-dim: rgba(138, 58, 58, 0.15);
+  --blue: #4a6a8a;
+  --blue-dim: rgba(74, 106, 138, 0.15);
+  --muted: #5a4a6a;
+  --muted-dim: rgba(90, 74, 106, 0.15);
+  --warm: #7a5a3a;
+  --warm-dim: rgba(122, 90, 58, 0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-left { display: flex; align-items: center; gap: 14px; }
+
+/* Sword icon next to title */
+.sword-icon {
+  width: 22px;
+  height: 38px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text);
+  line-height: 1.2;
+}
+.brand-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  margin-top: 1px;
+}
+
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--green-dim);
+  color: var(--green);
+  border: 1px solid rgba(74, 138, 106, 0.2);
+}
+.dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+}
+
+/* STATS */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 24px 0;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+.stat-num { font-size: 22px; font-weight: 700; margin-bottom: 2px; letter-spacing: -0.5px; }
+.stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; }
+
+/* AGENT CARDS */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 24px 0; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.card-name { font-size: 13px; font-weight: 600; letter-spacing: -0.3px; }
+.card-role { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+.badge {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.badge-working { background: var(--green-dim); color: var(--green); }
+.badge-idle    { background: var(--blue-dim); color: var(--blue); }
+.badge-blocked { background: var(--red-dim); color: var(--red); }
+.badge-done    { background: var(--muted-dim); color: #8a7aaa; }
+.card-task { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-task.active { color: var(--text); }
+.bar { height: 2px; background: var(--surface2); border-radius: 1px; overflow: hidden; margin-top: 4px; }
+.bar-fill { height: 100%; border-radius: 1px; }
+.bar-fill.gold  { background: var(--gold); }
+.bar-fill.green { background: var(--green); }
+.bar-fill.red   { background: var(--red); }
+.bar-fill.blue  { background: var(--blue); }
+.bar-fill.muted { background: #8a7aaa; }
+.bar-fill.warm  { background: var(--warm); }
+.blocker { font-size: 9px; color: var(--red); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+.card-footer { margin-top: 8px; font-size: 10px; color: var(--text-dim); }
+
+/* SECTION */
+.sec-title {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin: 16px 24px 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* MESSAGES */
+.msg-list { max-height: 200px; overflow-y: auto; }
+.msg-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px;
+  background: var(--surface2);
+  border-radius: 4px;
+  margin-bottom: 3px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.msg-from { color: var(--gold); font-weight: 500; min-width: 44px; }
+.msg-arrow { color: var(--text-dim); }
+.msg-to { color: var(--text-dim); min-width: 44px; }
+.msg-type { color: var(--text-dim); padding: 1px 4px; border-radius: 2px; background: var(--surface); flex-shrink: 0; font-size: 8px; text-transform: uppercase; }
+.msg-text { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.msg-time { color: var(--text-dim); flex-shrink: 0; font-size: 9px; }
+.msg-prio { padding: 1px 3px; border-radius: 2px; font-size: 7px; text-transform: uppercase; flex-shrink: 0; }
+.high { background: var(--red-dim); color: var(--red); }
+.norm { background: var(--surface); color: var(--text-dim); }
+
+/* MEMORY */
+.mem-list { max-height: 120px; overflow-y: auto; }
+.mem-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--surface2); border-radius: 4px; margin-bottom: 3px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+.mem-key { color: var(--gold); flex-shrink: 0; min-width: 100px; font-size: 9px; font-weight: 500; }
+.mem-val { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.mem-from { color: var(--text-dim); background: var(--surface); padding: 1px 4px; border-radius: 2px; flex-shrink: 0; font-size: 8px; }
+
+/* FOOTER */
+.footer { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-dim); margin: 16px 24px 0; padding: 10px 0 20px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+.empty { text-align: center; padding: 16px; color: var(--text-dim); font-size: 10px; }
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <!-- Excalibur: vertical sword icon -->
+    <svg class="sword-icon" viewBox="0 0 24 40" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2L13.5 18L12 36L10.5 18Z" fill="currentColor" opacity="0.9"/>
+      <path d="M11.5 5L12 30L12.5 5Z" fill="var(--bg)"/>
+      <path d="M7 17C7 17 9.5 18.5 12 18.5C14.5 18.5 17 17 17 17" stroke-width="1.5" fill="none"/>
+      <path d="M5.5 17C4 16 4 16 4 17.5C4 19 5.5 18.5 5.5 17Z"/>
+      <path d="M18.5 17C20 16 20 16 20 17.5C20 19 18.5 18.5 18.5 17Z"/>
+      <rect x="10.5" y="20" width="3" height="10" rx="0.5" fill="currentColor" opacity="0.6"/>
+      <circle cx="12" cy="33" r="2.2" fill="currentColor" opacity="0.7"/>
+    </svg>
+    <div>
+      <div class="brand-name">Round Table</div>
+      <div class="brand-sub">Multi-Agent Protocol</div>
+    </div>
+  </div>
+  <div class="status-pill">
+    <div class="dot"></div>
+    Active
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="grid" id="agents"></div>
+
+<div class="sec-title">Messages</div>
+<div class="msg-list" id="msgs"></div>
+
+<div class="sec-title" style="margin-top:16px">Memory</div>
+<div class="mem-list" id="mems"></div>
+
+<div class="footer">
+  <span>Round Table &middot; RTP v1.2</span>
+  <span id="total">0 messages</span>
+</div>
+
+<script>
+const AGENTS = [
+  { id: 'arthur',   name: 'ARTHUR',   role: 'Sovereign',  c: 'arthur' },
+  { id: 'merlin',   name: 'MERLIN',   role: 'Wizard',     c: 'merlin' },
+  { id: 'percival', name: 'PERCIVAL', role: 'Builder',    c: 'percival' },
+  { id: 'bedivere', name: 'BEDIVERE', role: 'Chronicler', c: 'bedivere' },
+  { id: 'lancelot', name: 'LANCELOT', role: 'Guardian',   c: 'lancelot' }
+];
+
+// Demo data — shown until live data from .dashboard/*.json loads
+const DEMO_STATUS = {
+  arthur:   { status: 'working', task: 'Strategic planning for v2',  progress: '2/4 phases', blockers: [] },
+  merlin:   { status: 'working', task: 'Research: AI agent frameworks', progress: '3/5 sources', blockers: [] },
+  percival: { status: 'working', task: 'CrewAI POC scaffold',       progress: '4/7 modules', blockers: [] },
+  bedivere: { status: 'done',    task: 'CrewAI architecture docs',  progress: 'Complete',   blockers: [] },
+  lancelot: { status: 'working', task: 'QA: Protocol tests',        progress: '4/7 tests',  blockers: [] }
+};
+
+const DEMO_MSGS = [
+  { from: 'lancelot', to: 'percival',  type: 'finding',   prio: 'normal', time: '13:14', txt: 'Tests pass, no issues' },
+  { from: 'merlin',   to: 'bedivere',  type: 'finding',   prio: 'normal', time: '13:12', txt: 'CrewAI has best role-based coordination model' },
+  { from: 'bedivere', to: 'percival',  type: 'question',  prio: 'normal', time: '13:12', txt: 'Can you build a CrewAI POC by Thursday?' },
+  { from: 'percival', to: 'bedivere',  type: 'accept',    prio: 'normal', time: '13:12', txt: 'Thursday EOD' },
+  { from: 'lancelot', to: 'arthur',    type: 'status',    prio: 'normal', time: '13:12', txt: 'QA: 4/7 tests passing' },
+  { from: 'percival', to: 'arthur',    type: 'artifact',  prio: 'normal', time: '13:12', txt: 'CrewAI scaffold -> /tmp/crewai-scaffold.js' },
+  { from: 'arthur',   to: 'merlin',    type: 'offer',     prio: 'high',  time: '13:12', txt: 'Research AI agent frameworks' },
+  { from: 'merlin',   to: 'arthur',    type: 'accept',    prio: 'high',  time: '13:12', txt: '15 minutes' }
+];
+
+const DEMO_MEM = [
+  { k: 'arch.framework',  v: 'CrewAI chosen for multi-agent coordination', f: 'arthur' },
+  { k: 'research.top3',   v: 'CrewAI, AutoGen, LangGraph', f: 'merlin' }
+];
+
+let STATUS = DEMO_STATUS;
+let MSGS = DEMO_MSGS;
+let MEM = DEMO_MEM;
+let live = false;
+
+// All dynamic strings pass through esc() before hitting innerHTML
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function payloadText(p) {
+  if (p == null) return '';
+  if (typeof p === 'string') return p;
+  return Object.values(p).filter(v => typeof v === 'string').join(' · ') || JSON.stringify(p);
+}
+
+async function fetchJSON(path) {
+  const r = await fetch(path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function refresh() {
+  try {
+    const [msgs, mem, status] = await Promise.all([
+      fetchJSON('.dashboard/messages.json'),
+      fetchJSON('.dashboard/memory.json'),
+      fetchJSON('.dashboard/status.json').catch(() => [])
+    ]);
+    MSGS = msgs.map(m => ({
+      from: m.from || '?', to: m.to || '?', type: m.type || '',
+      prio: m.priority || 'normal',
+      time: (m.timestamp || '').slice(11, 16),
+      txt: payloadText(m.payload)
+    }));
+    MEM = mem.map(e => ({ k: e.key, v: typeof e.value === 'string' ? e.value : JSON.stringify(e.value), f: e.from }));
+    STATUS = {};
+    for (const s of status) {
+      STATUS[s.agent] = {
+        status: s.status || 'idle',
+        task: s.current_task || '',
+        progress: s.progress || '',
+        blockers: s.blockers || []
+      };
+    }
+    live = true;
+  } catch (e) {
+    // No live data (file:// or missing files) — keep demo data
+  }
+  render();
+}
+
+function render() {
+  const pill = document.querySelector('.status-pill');
+  if (pill) pill.lastChild.textContent = live ? ' Live' : ' Demo';
+
+  const active = Object.values(STATUS).filter(s => s.status === 'working').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-num">${AGENTS.length}</div><div class="stat-label">Agents</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--green)">${active}</div><div class="stat-label">Active</div></div>
+    <div class="stat"><div class="stat-num">${MSGS.length}</div><div class="stat-label">Messages</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--gold)">${MEM.length}</div><div class="stat-label">Memory</div></div>
+  `;
+
+  let cards = '';
+  for (const a of AGENTS) {
+    const s = STATUS[a.id] || { status: 'idle', task: '', progress: '', blockers: [] };
+    const has = s.task && s.task !== 'Initializing';
+    let pct = '0%';
+    const m = s.progress && s.progress.match(/(\d+)\s*(?:\/|of)\s*(\d+)/);
+    if (m) pct = Math.round(parseInt(m[1]) / parseInt(m[2]) * 100) + '%';
+    else if (s.status === 'done' || s.progress === 'Complete') pct = '100%';
+    const badge = ['working','idle','blocked','done'].includes(s.status) ? s.status : 'idle';
+    const bl = s.blockers.length ? `<div class="blocker">⚠ ${esc(s.blockers[0])}</div>` : '';
+    const bf = a.c === 'arthur' ? 'gold' : a.c === 'merlin' ? 'blue' : a.c === 'percival' ? 'green' : a.c === 'bedivere' ? 'warm' : 'red';
+    cards += `<div class="card"><div class="card-head"><div><div class="card-name">${a.name}</div><div class="card-role">${a.role}</div></div><span class="badge badge-${badge}">${esc(s.status)}</span></div><div class="${has?'card-task active':'card-task'}">${has?esc(s.task):'Standing by'}</div>${s.progress?`<div class="bar"><div class="bar-fill ${bf}" style="width:${pct}"></div></div>`:''}${bl}<div class="card-footer">${MSGS.filter(m=>m.to===a.id||m.to==='broadcast').length} messages</div></div>`;
+  }
+  document.getElementById('agents').innerHTML = cards;
+
+  const sorted = [...MSGS].sort((a,b) => b.time.localeCompare(a.time));
+  document.getElementById('msgs').innerHTML = sorted.map(m => `<div class="msg-item"><span class="msg-from">${esc(m.from.substring(0,6).toUpperCase())}</span><span class="msg-arrow">→</span><span class="msg-to">${esc(m.to.substring(0,6).toUpperCase())}</span><span class="msg-type">${esc(m.type)}</span><span class="msg-text">${esc(m.txt)}</span><span class="msg-time">${esc(m.time)}</span><span class="msg-prio ${m.prio==='high'||m.prio==='urgent'?'high':'norm'}">${esc(m.prio)}</span></div>`).join('') || '<div class="empty">No messages</div>';
+
+  document.getElementById('mems').innerHTML = MEM.map(m => `<div class="mem-item"><span class="mem-key">${esc(m.k)}</span><span class="mem-val">${esc(m.v)}</span><span class="mem-from">${esc(m.f)}</span></div>`).join('') || '<div class="empty">No memory</div>';
+
+  document.getElementById('total').textContent = `${MSGS.length} messages`;
+}
+
+render();
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
