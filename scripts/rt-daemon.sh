@@ -35,7 +35,7 @@ check_new_messages() {
   shopt -u nullglob
 
   local f msg_id ts
-  for f in "${files[@]}"; do
+  for f in "${files[@]+"${files[@]}"}"; do
     msg_id=$(basename "$f" .json)
 
     # Check if already notified (match the exact msg_id field value)
@@ -129,7 +129,10 @@ cmd_run() {
   # Main daemon loop
   log "Daemon loop started"
 
-  # Detect file watcher
+  # Detect file watcher — extend PATH for Homebrew on macOS
+  local path_ext="/opt/homebrew/bin:/usr/local/bin"
+  export PATH="$PATH:$path_ext"
+
   local watcher=""
   if command -v fswatch &>/dev/null; then
     watcher="fswatch"

@@ -6,11 +6,12 @@
 set -euo pipefail
 
 RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DASH="$RT_DIR/.dashboard"
 
 # Refresh live data (best-effort; show whatever exists if it fails)
-if [[ -x "$RT_DIR/generate-dashboard-data.sh" ]]; then
-  "$RT_DIR/generate-dashboard-data.sh" >/dev/null 2>&1 || true
+if [[ -x "$SCRIPT_DIR/generate-dashboard-data.sh" ]]; then
+  "$SCRIPT_DIR/generate-dashboard-data.sh" >/dev/null 2>&1 || true
 fi
 
 RTP_DASH="$DASH" python3 << 'PYEOF'
