@@ -1,34 +1,42 @@
 # Round Table Dev Loop — Final Report
 
-**Project:** `round-table-protocol`
+**Project:** `/Users/arielkurek/Desktop/Ari/round-table-protocol`
+**Task:** test, fix and improve
 **Completed:** 2026-06-13
+**Branch:** `rt-loop/2026-06-13-test-fix-improve`
 **Status:** CONVERGED
 
-## Summary of Fixes
+## Summary
 
-We identified and resolved performance inefficiencies related to **N+1 process spawning** in loops during message status/urgent scans.
+| Metric | Count |
+|--------|-------|
+| Total issues identified | 5 |
+| Issues resolved | 5 |
+| Issues remaining | 0 |
+| Cycles | 1 |
+| Converged | Yes |
+| Wall time | ~5 min |
+| Tests | 105 passed, 0 failed |
+| Shellcheck | Clean (all scripts) |
 
-1. **rt-session-checkin.sh**:
-   - **Problem:** Spawned multiple `python3` processes per urgent message file and one per regular message file in the inbox loop to query JSON fields (`priority`, `from`, `type`). This caused slow and wasteful process allocation when inboxes grew.
-   - **Resolution:** Refactored to read and parse all files in a single invocation of Python, returning the counts and details in a structured format. Added proper `nullglob` safety checks.
-   - **Parity:** Updated the copy under `skills/round-table-protocol/scripts/` to ensure the skill and repository scripts remain in sync.
+## Resolved Issues
 
-2. **rt-watch.sh**:
-   - **Problem:** Spawned a `python3` process for every single message file in the inbox loop to verify if priority was `urgent`.
-   - **Resolution:** Modified the loop to pass all JSON files as arguments to a single Python execution, counting the urgent entries in one pass.
-   - **Parity:** Synchronized changes with the skill copy at `skills/round-table-protocol/scripts/`.
+1. **perf: N+1 python3 in rt-checkin.sh** — Urgent message scan spawned one python3 process per inbox file. Batched into a single invocation. Also fixed pending-count loop to use nullglob.
 
-## Test Status & Verification
+2. **perf: N+1 python3 in rt-inbox.sh** — Inbox listing spawned one python3 process per file. Batched into a single invocation.
 
-We successfully added new test cases to the test suite:
-- **rt-session-checkin.sh coverage:** Added 9 new assertions to verify empty checkins, message counts, repeat runs (ensuring silence), and details formatting for urgent messages.
-- **ensure-dashboard.sh coverage:** Added 2 new assertions to verify execution and log creation.
+3. **shellcheck SC2012 in rt-cleanup.sh** — `ls -t` replaced with `stat`-based sort for `--keep-last`. Cross-platform: `stat -f` on macOS, `stat -c` on Linux.
 
-Running `./tests/run_tests.sh` passes successfully with all green assertions:
-- **Test suite results:** **132 passed, 0 failed** (an increase of 11 assertions from the baseline of 121).
+4. **shellcheck SC2005 in rt-session-checkin.sh** — Removed useless `echo` around `date +%s`.
 
-## Build Status
+5. **docs: README missing 3 scripts** — Added `rt-session-checkin.sh`, `rt-dashboard-text.sh`, and `ensure-dashboard.sh` to the scripts table.
 
-- **Shellcheck / Linter:** Clean
-- **Dashboard Text:** Functional and successfully tested
-- **Real-Agent Dispatch / Stub Tests:** Pass
+## Verification
+
+- **Tests:** 105 passed, 0 failed (no regression from baseline)
+- **Shellcheck:** All scripts clean
+- **Parity:** skills/ copies synced with scripts/
+
+## Commits
+
+- `43e3ce1` — perf: eliminate N+1 python3 in rt-checkin.sh and rt-inbox.sh, fix shellcheck warnings
