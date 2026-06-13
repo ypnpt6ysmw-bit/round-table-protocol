@@ -69,6 +69,17 @@ rt-daemon.sh start|stop|status
 rt-cleanup.sh --older-than <hours> [--dry-run]
 ```
 
+### Dispatch — real agent delivery
+```
+rt-dispatch.sh once [agent]      # spawn hermes -p <agent> sessions for unread mail
+rt-dispatch.sh start|stop|status # background polling dispatcher (30s)
+rt-devloop.sh "<task>" [--phase <p>] [--dry-run]   # plan→arthur, research→merlin, build→percival, write→bedivere, qa→lancelot
+```
+
+Each dispatched session runs under the target knight's own Hermes profile —
+own SOUL.md, own skills, own model. Messages that fail 3 delivery attempts are
+parked in `inbox/<agent>/failed/`.
+
 ## See Also
 
 - `references/shell-scripting-patterns.md` — scripting patterns that prevent bugs in Hermes skill shell scripts

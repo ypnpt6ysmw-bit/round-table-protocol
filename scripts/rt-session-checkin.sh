@@ -7,7 +7,6 @@ set -euo pipefail
 AGENT="${1:?Usage: rt-session-checkin.sh <agent>}"
 RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
 INBOX_DIR="$RT_DIR/inbox/$AGENT"
-STATUS_FILE="$RT_DIR/status/${AGENT}.json"
 STATE_FILE="$RT_DIR/.checkin-state-${AGENT}"
 
 # Read last known message count

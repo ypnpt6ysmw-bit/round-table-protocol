@@ -90,7 +90,7 @@ All 5 agent profiles updated with `## Round Table Protocol` section containing:
 
 1. ~~**Dashboard data is static**~~ — RESOLVED 2026-06-12: dashboard now fetches `.dashboard/{messages,memory,status}.json` every 5s with demo fallback (header pill shows Live/Demo). `generate-dashboard-data.sh` also emits `status.json` now.
 2. ~~**Daemon needs manual start**~~ — RESOLVED 2026-06-12: Cron jobs installed (`*/2 * * * *` auto-start + `*/5 * * * *` data refresh). Daemon running at PID tracked in `.dashboard/daemon.pid`. Logs at `.dashboard/httpd.log` and `.dashboard/cron.log`.
-3. **No real agent sessions yet** — The protocol works via scripts but no actual Hermes sessions have been spawned to use it yet.
+3. ~~**No real agent sessions yet**~~ — RESOLVED 2026-06-13: `rt-dispatch.sh` spawns actual `hermes -p <agent>` profile sessions per unread inbox (own SOUL.md + own model per knight); `rt-devloop.sh` (now in repo) runs each dev-loop phase as a real profile session instead of same-model delegate_task personas.
 4. **Merge with existing codebase** — This was built outside the main Ari repo. Need to decide where it lives.
 
 ## QA Pass 2026-06-12

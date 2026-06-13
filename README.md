@@ -58,8 +58,28 @@ open dashboard/dashboard.html
 | `rt-memory.sh` | Shared memory (set/get/search/delete) |
 | `rt-cleanup.sh` | Archive old messages, vacuum deleted |
 | `rt-watch.sh` | Real-time monitoring |
-| `rt-daemon.sh` | Background inbox watcher |
+| `rt-daemon.sh` | Background inbox watcher (notification stream) |
+| `rt-dispatch.sh` | **Deliver messages to real agents** — spawns `hermes -p <agent>` profile sessions |
+| `rt-devloop.sh` | Dev loop: each phase runs as a real knight profile session (plan→arthur, research→merlin, build→percival, write→bedivere, qa→lancelot) |
 | `generate-dashboard-data.sh` | Regenerate dashboard JSON data |
+
+## Real agents, not subagents
+
+Messages become real work via `rt-dispatch.sh`: for every agent with unread
+inbox messages it launches an actual Hermes session under that agent's own
+profile (`hermes -p merlin -z …`), so each knight runs with its own SOUL.md,
+skills and configured model. The spawned agent reads, acts, replies via
+`rt-send.sh`, acks, and updates its status card.
+
+```bash
+scripts/rt-dispatch.sh once          # one pass over all inboxes
+scripts/rt-dispatch.sh start         # background polling daemon (30s)
+scripts/rt-dispatch.sh status        # daemon state + unread counts
+```
+
+Failed deliveries retry up to 3 sessions, then park in `inbox/<agent>/failed/`.
+Per-agent locks prevent double-spawning. `HERMES_BIN` env overrides the binary
+(used by tests to stub model calls).
 
 ## Dashboard
 

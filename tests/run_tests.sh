@@ -304,6 +304,86 @@ assert_file "dashboard data: memory.json" "$ROUND_TABLE_DIR/.dashboard/memory.js
 assert_valid_json "dashboard data: messages valid" "$ROUND_TABLE_DIR/.dashboard/messages.json"
 assert_valid_json "dashboard data: memory valid" "$ROUND_TABLE_DIR/.dashboard/memory.json"
 
+### rt-dispatch + rt-devloop (stubbed hermes — no real model calls) #######
+STUB_BIN="$SANDBOX/bin"
+mkdir -p "$STUB_BIN"
+CALLS_LOG="$SANDBOX/hermes_calls.log"
+cat > "$STUB_BIN/hermes-stub" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "ARGS: \$*" >> "$CALLS_LOG"
+echo "STUB OK"
+STUB
+chmod +x "$STUB_BIN/hermes-stub"
+export HERMES_BIN="$STUB_BIN/hermes-stub"
+
+if [[ -d "$HOME/.hermes/profiles/merlin" ]]; then
+  # clear inboxes so only our seeded message exists
+  for a in arthur merlin percival bedivere lancelot; do
+    rm -f "$ROUND_TABLE_DIR/inbox/$a/"*.json 2>/dev/null || true
+  done
+  "$SCRIPTS/rt-send.sh" --from arthur --to merlin --type question --payload '{"q":"dispatch test"}' >/dev/null
+  DISPATCH_MSG=$(basename "$(ls "$ROUND_TABLE_DIR/inbox/merlin/"*.json | head -1)" .json)
+
+  run "dispatch: once spawns profile session" 0 "$SCRIPTS/rt-dispatch.sh" once merlin
+  grep -q -- "-p merlin -z" "$CALLS_LOG" && PASS=$((PASS+1)) || {
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("dispatch: hermes -p merlin invoked"); echo "FAIL: stub not called with -p merlin"; }
+  grep -q "$DISPATCH_MSG" "$CALLS_LOG" && PASS=$((PASS+1)) || {
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("dispatch: prompt carries msg id"); echo "FAIL: msg id missing from prompt"; }
+
+  # empty inbox → no spawn
+  : > "$CALLS_LOG"
+  run "dispatch: empty inbox no spawn" 0 "$SCRIPTS/rt-dispatch.sh" once arthur
+  if grep -q -- "-p arthur" "$CALLS_LOG"; then
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("dispatch: no spawn on empty inbox"); echo "FAIL: spawned for empty inbox"
+  else
+    PASS=$((PASS+1))
+  fi
+
+  # live lock → skip
+  mkdir -p "$ROUND_TABLE_DIR/.dispatch/merlin.lock"
+  echo $$ > "$ROUND_TABLE_DIR/.dispatch/merlin.lock/pid"
+  : > "$CALLS_LOG"
+  run "dispatch: live lock skips" 0 "$SCRIPTS/rt-dispatch.sh" once merlin
+  if grep -q -- "-p merlin" "$CALLS_LOG"; then
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("dispatch: lock respected"); echo "FAIL: dispatched despite live lock"
+  else
+    PASS=$((PASS+1))
+  fi
+  rm -rf "$ROUND_TABLE_DIR/.dispatch/merlin.lock"
+
+  # retry exhaustion: stub never acks; attempt 1 already used. Two more passes
+  # reach MAX_ATTEMPTS=3, next pass parks the message into failed/.
+  run "dispatch: retry pass 2" 0 "$SCRIPTS/rt-dispatch.sh" once merlin
+  run "dispatch: retry pass 3" 0 "$SCRIPTS/rt-dispatch.sh" once merlin
+  run "dispatch: parking pass" 0 "$SCRIPTS/rt-dispatch.sh" once merlin
+  assert_file "dispatch: exhausted message parked" "$ROUND_TABLE_DIR/inbox/merlin/failed/${DISPATCH_MSG}.json"
+
+  # devloop dry-run: prints all phases, spawns nothing
+  : > "$CALLS_LOG"
+  run "devloop: dry-run" 0 "$SCRIPTS/rt-devloop.sh" --dry-run "test task"
+  assert_contains "devloop: dry-run shows PLAN" "PLAN prompt"
+  assert_contains "devloop: dry-run shows QA" "QA prompt"
+  [[ ! -s "$CALLS_LOG" ]] && PASS=$((PASS+1)) || {
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("devloop: dry-run spawns nothing"); echo "FAIL: dry-run called hermes"; }
+
+  # devloop full run with stub: all 5 phases, context chained
+  : > "$CALLS_LOG"
+  run "devloop: stubbed full loop" 0 "$SCRIPTS/rt-devloop.sh" "stub loop task"
+  DEVLOOP_DIR=$(ls -dt "$ROUND_TABLE_DIR/devloop/"devloop-* | head -1)
+  for ph in plan research build write qa; do
+    assert_file "devloop: $ph output exists" "$DEVLOOP_DIR/$ph.md"
+  done
+  grep -q "### PLAN output" "$CALLS_LOG" && PASS=$((PASS+1)) || {
+    FAIL=$((FAIL+1)); FAILED_NAMES+=("devloop: context chains between phases"); echo "FAIL: research prompt missing PLAN context"; }
+  for agent in arthur merlin percival bedivere lancelot; do
+    grep -q -- "-p $agent -z" "$CALLS_LOG" && PASS=$((PASS+1)) || {
+      FAIL=$((FAIL+1)); FAILED_NAMES+=("devloop: real profile $agent invoked"); echo "FAIL: phase did not run under profile $agent"; }
+  done
+else
+  echo "SKIP: dispatch/devloop tests (no ~/.hermes/profiles/merlin on this machine)"
+fi
+unset HERMES_BIN
+
 ### parity: scripts/ vs skills copy #######################################
 PARITY_OK=1
 for f in "$SCRIPTS"/rt-*.sh; do
