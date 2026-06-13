@@ -19,6 +19,9 @@
 #   RT_DISPATCH_TIMEOUT  seconds per agent session (default 600)
 set -euo pipefail
 
+# Resolve real user home (Hermes profile may override $HOME)
+_REAL_USER_HOME="$(eval echo ~"$(whoami)")"
+
 ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
 CONFIG="$ROUND_TABLE_DIR/config.json"
 HERMES_BIN="${HERMES_BIN:-hermes}"
@@ -170,8 +173,8 @@ dispatch_agent() {  # dispatch_agent <agent> -> spawn real profile session
     return 0
   fi
 
-  if [[ ! -d "$HOME/.hermes/profiles/$agent" ]]; then
-    log "$agent: ERROR no Hermes profile at ~/.hermes/profiles/$agent"
+  if [[ ! -d "$_REAL_USER_HOME/.hermes/profiles/$agent" ]]; then
+    log "$agent: ERROR no Hermes profile at $_REAL_USER_HOME/.hermes/profiles/$agent"
     return 1
   fi
 

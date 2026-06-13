@@ -25,6 +25,9 @@
 #   RT_PHASE_TIMEOUT  seconds per phase session (default 900)
 set -euo pipefail
 
+# Resolve real user home (Hermes profile may override $HOME)
+_REAL_USER_HOME="$(eval echo ~"$(whoami)")"
+
 ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
 HERMES_BIN="${HERMES_BIN:-hermes}"
 TIMEOUT_SECS="${RT_PHASE_TIMEOUT:-900}"
@@ -132,8 +135,8 @@ run_phase() {  # run_phase <phase>
     return 0
   fi
 
-  if [[ ! -d "$HOME/.hermes/profiles/$agent" ]]; then
-    echo "Error: no Hermes profile for $agent at ~/.hermes/profiles/$agent" >&2
+  if [[ ! -d "$_REAL_USER_HOME/.hermes/profiles/$agent" ]]; then
+    echo "Error: no Hermes profile for $agent at $_REAL_USER_HOME/.hermes/profiles/$agent" >&2
     return 1
   fi
 
