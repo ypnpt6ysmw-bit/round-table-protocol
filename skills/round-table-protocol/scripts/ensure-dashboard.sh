@@ -6,6 +6,13 @@
 set -euo pipefail
 
 RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Copy dashboard HTML from the skill package to the served directory
+SKILL_DASHBOARD="$SCRIPT_DIR/../dashboard.html"
+if [[ -f "$SKILL_DASHBOARD" ]]; then
+  cp "$SKILL_DASHBOARD" "$RT_DIR/dashboard.html"
+fi
 
 if ! lsof -ti tcp:8101 >/dev/null 2>&1; then
   nohup python3 -m http.server 8101 --directory "$RT_DIR" \

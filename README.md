@@ -109,6 +109,7 @@ Failed deliveries retry up to 3 sessions, then park in `inbox/<agent>/failed/`. 
 | `rt-session-checkin.sh` | Per-session inbox check (urgent message injection) |
 | `rt-daemon.sh` | Background inbox watcher (notification stream) |
 | `rt-dashboard-text.sh` | Chat-friendly text status board |
+| `rt-dashboard-refresh.sh` | Cron job script: refreshes dashboard data + HTTP server |
 | `rt-dispatch.sh` | **Deliver messages to real agents** — spawns `hermes -p <agent>` profile sessions |
 | `rt-devloop.sh` | Dev loop: each phase runs as a real knight profile session (plan→arthur, research→merlin, build→percival, write→bedivere, qa→lancelot) |
 | `ensure-dashboard.sh` | Keep dashboard HTTP server running + data fresh |
