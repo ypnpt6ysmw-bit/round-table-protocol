@@ -79,7 +79,13 @@ for agent_dir in "$ROUND_TABLE_DIR"/inbox/*/; do
   # Newest-first list for --keep-last
   keep_set=""
   if [[ -n "$KEEP_LAST" && "$KEEP_LAST" -gt 0 && $total -gt 0 ]]; then
-    keep_set=$(ls -t "$agent_dir"*.json 2>/dev/null | head -n "$KEEP_LAST")
+    if [[ "$(uname)" == "Darwin" ]]; then
+      keep_set=$(for f in "$agent_dir"*.json; do [[ -f "$f" ]] && stat -f "%m %N" "$f"; done 2>/dev/null \
+        | sort -rn | head -n "$KEEP_LAST" | cut -d' ' -f2-)
+    else
+      keep_set=$(for f in "$agent_dir"*.json; do [[ -f "$f" ]] && stat -c "%Y %n" "$f"; done 2>/dev/null \
+        | sort -rn | head -n "$KEEP_LAST" | cut -d' ' -f2-)
+    fi
   fi
 
   for f in "${files[@]+"${files[@]}"}"; do

@@ -14,10 +14,10 @@ echo ""
 # Count pending messages
 PENDING=0
 if [[ -d "$INBOX_DIR" ]]; then
-  for f in "$INBOX_DIR"/*.json; do
-    [[ ! -f "$f" ]] && continue
-    PENDING=$((PENDING+1))
-  done
+  shopt -s nullglob
+  files=("$INBOX_DIR"/*.json)
+  shopt -u nullglob
+  PENDING=${#files[@]}
 fi
 echo "Pending messages: $PENDING"
 echo ""
@@ -44,15 +44,19 @@ done
 if [[ $PENDING -gt 0 ]]; then
   echo ""
   echo "--- Urgent Messages ---"
-  for f in "$INBOX_DIR"/*.json; do
-    [[ ! -f "$f" ]] && continue
-    python3 -c '
+  shopt -s nullglob
+  files=("$INBOX_DIR"/*.json)
+  shopt -u nullglob
+  python3 -c '
 import json, sys
-d = json.load(open(sys.argv[1]))
-if d["priority"] in ("urgent", "high"):
-    print("  [{}] {} -> {} | {}: {}".format(d["priority"], d["from"], d["to"], d["type"], str(d.get("payload", {}))[:80]))
-' "$f" 2>/dev/null
-  done
+for path in sys.argv[1:]:
+    try:
+        d = json.load(open(path))
+        if d.get("priority") in ("urgent", "high"):
+            print("  [{}] {} -> {} | {}: {}".format(d["priority"], d["from"], d["to"], d["type"], str(d.get("payload", {}))[:80]))
+    except Exception:
+        pass
+' "${files[@]}" 2>/dev/null
 fi
 
 echo ""

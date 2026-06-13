@@ -58,9 +58,12 @@ open dashboard/dashboard.html
 | `rt-memory.sh` | Shared memory (set/get/search/delete) |
 | `rt-cleanup.sh` | Archive old messages, vacuum deleted |
 | `rt-watch.sh` | Real-time monitoring |
+| `rt-session-checkin.sh` | Per-session inbox check (urgent message injection) |
 | `rt-daemon.sh` | Background inbox watcher (notification stream) |
+| `rt-dashboard-text.sh` | Chat-friendly text status board |
 | `rt-dispatch.sh` | **Deliver messages to real agents** — spawns `hermes -p <agent>` profile sessions |
 | `rt-devloop.sh` | Dev loop: each phase runs as a real knight profile session (plan→arthur, research→merlin, build→percival, write→bedivere, qa→lancelot) |
+| `ensure-dashboard.sh` | Keep dashboard HTTP server running + data fresh |
 | `generate-dashboard-data.sh` | Regenerate dashboard JSON data |
 
 ## Real agents, not subagents

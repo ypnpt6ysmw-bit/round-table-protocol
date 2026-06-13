@@ -47,16 +47,15 @@ case "$ACTION" in
       echo "(empty)"
       exit 0
     fi
-    for f in "${FILES[@]}"; do
-      python3 -c "
+    python3 -c "
 import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-    print('  {}... | {:20s} | from: {:10s} | prio: {}'.format(d['id'][:12], d['type'], d['from'], d['priority']))
-except Exception as e:
-    print('  [unreadable] {}: {}'.format(sys.argv[1], e), file=sys.stderr)
-" "$f"
-    done
+for path in sys.argv[1:]:
+    try:
+        d = json.load(open(path))
+        print('  {}... | {:20s} | from: {:10s} | prio: {}'.format(d['id'][:12], d['type'], d['from'], d['priority']))
+    except Exception as e:
+        print('  [unreadable] {}: {}'.format(path, e), file=sys.stderr)
+" "${FILES[@]}"
     ;;
   read)
     MSG_ID="${1:-}"
