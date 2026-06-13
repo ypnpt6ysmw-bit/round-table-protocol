@@ -73,6 +73,6 @@ mv "$tmp_state" "$STATE_FILE"
 if [[ $PENDING -gt $LAST_COUNT ]] || [[ $URGENT -gt 0 ]]; then
   echo "[Round Table] $AGENT: $PENDING pending ($URGENT urgent)"
   if [[ $URGENT -gt 0 ]]; then
-    echo -e "[Round Table] URGENT:$URGENT_MSGS"
+    printf "[Round Table] URGENT:%s\n" "$URGENT_MSGS"
   fi
 fi

@@ -19,107 +19,123 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-AGENTS=$(python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['agents']))" "$CONFIG" 2>/dev/null \
-  || echo "arthur merlin percival bedivere lancelot")
-
 show_snapshot() {
   echo "=== Round Table Pulse Check ==="
   echo "  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo ""
 
-  # Status cards
-  echo "--- Agents ---"
-  for agent in $AGENTS; do
-    status_file="$ROUND_TABLE_DIR/status/${agent}.json"
-    if [[ -f "$status_file" ]]; then
-      python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-print('  {:12s} | {:10s} | {:50s}'.format(d['agent'], d['status'], d.get('current_task', '')[:50]))
-" "$status_file"
-    else
-      echo "  $agent: (no status)"
-    fi
-  done
+  # Single python3 invocation for all snapshot data
+  _RTW_RT_DIR="$ROUND_TABLE_DIR" _RTW_CFG="$CONFIG" _RTW_AGENT="$AGENT" python3 -c '
+import json, os, glob
 
-  # Pending messages
-  echo ""
-  echo "--- Pending Messages ---"
-  for agent in $AGENTS; do
-    [[ -n "$AGENT" ]] && [[ "$agent" != "$AGENT" ]] && continue
-    inbox="$ROUND_TABLE_DIR/inbox/$agent"
-    if [[ -d "$inbox" ]]; then
-      shopt -s nullglob
-      files=("$inbox"/*.json)
-      shopt -u nullglob
-      pending=${#files[@]}
-      if [[ $pending -gt 0 ]]; then
-        urgent=$(python3 -c '
-import json, sys
-count = 0
-for path in sys.argv[1:]:
+rt_dir = os.environ["_RTW_RT_DIR"]
+config = os.environ["_RTW_CFG"]
+agent_filter = os.environ.get("_RTW_AGENT", "")
+
+# Load agents
+try:
+    agents = json.load(open(config))["agents"]
+except Exception:
+    agents = ["arthur", "merlin", "percival", "bedivere", "lancelot"]
+
+# Load status cards
+status = {}
+for a in agents:
     try:
-        with open(path) as f:
-            if json.load(f).get("priority") == "urgent":
-                count += 1
-    except Exception:
+        status[a] = json.load(open(os.path.join(rt_dir, "status", a + ".json")))
+    except (OSError, ValueError):
         pass
-print(count)
-' "${files[@]}")
-        echo "  $agent: $pending messages ($urgent urgent)"
-      fi
-    fi
-  done
 
-  # Shared memory
-  echo ""
-  echo "--- Shared Memory ---"
-  mem_file="$ROUND_TABLE_DIR/memory.jsonl"
-  if [[ -f "$mem_file" ]]; then
-    python3 -c "
-import json, sys
-total = active = 0
-recent = []
-for line in open(sys.argv[1]):
-    line = line.strip()
-    if not line:
-        continue
-    total += 1
-    try:
-        entry = json.loads(line)
-    except ValueError:
-        continue
-    if not entry.get('deleted'):
-        active += 1
-        recent.append(entry)
-print('  {} active entries (of {} total)'.format(active, total))
-for entry in recent[-3:]:
-    print('  {:40s} | from: {:10s} | tags: {}'.format(entry.get('key',''), entry.get('from',''), entry.get('tags', [])))
-" "$mem_file"
-  fi
+# Load pending messages + count urgents
+pending = {}
+for a in agents:
+    inbox = os.path.join(rt_dir, "inbox", a)
+    files = glob.glob(os.path.join(inbox, "*.json"))
+    urgent = 0
+    for f in files:
+        try:
+            msg = json.load(open(f))
+            if msg.get("priority") == "urgent":
+                urgent += 1
+        except (ValueError, OSError):
+            pass
+    if files:
+        pending[a] = (len(files), urgent)
 
-  # Recent notifications
-  echo ""
-  echo "--- Recent Notifications ---"
-  notif_file="$ROUND_TABLE_DIR/notifications.jsonl"
-  if [[ -f "$notif_file" ]]; then
-    tail -3 "$notif_file" 2>/dev/null | python3 -c "
-import json, sys
-shown = False
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
+# Load memory
+mem_file = os.path.join(rt_dir, "memory.jsonl")
+mem_entries = []
+if os.path.exists(mem_file):
+    seen = set()
+    for line in reversed(open(mem_file).readlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if entry.get("key") in seen:
+            continue
+        seen.add(entry["key"])
+        if not entry.get("deleted"):
+            mem_entries.append(entry)
+
+# Load recent notifications
+notif_file = os.path.join(rt_dir, "notifications.jsonl")
+recent_notifs = []
+if os.path.exists(notif_file):
+    lines = open(notif_file).readlines()
+    for line in lines[-3:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            recent_notifs.append(json.loads(line))
+        except ValueError:
+            pass
+
+# --- Render ---
+print("--- Agents ---")
+for a in agents:
+    s = status.get(a, {})
+    st = s.get("status", "idle")
+    task = s.get("current_task", "")[:50]
+    icons = {"working": "\U0001f7e2", "blocked": "\U0001f534", "done": "\u2705", "idle": "\u26aa"}
+    icon = icons.get(st, "\u26aa")
+    print(f"  {icon} {a:<12s} {st:<10s} {task}")
+
+print()
+print("--- Pending Messages ---")
+for a in agents:
+    if agent_filter and a != agent_filter:
         continue
-    try:
-        n = json.loads(line)
-    except ValueError:
-        continue
-    shown = True
-    print('  {} -> {:10s} | {:20s} | {}'.format(n.get('from','?'), n.get('notified_agent','?'), n.get('type',''), n.get('timestamp','')[:16]))
-if not shown:
-    print('  (none)')
-" || echo "  (none)"
-  fi
+    if a in pending:
+        cnt, urg = pending[a]
+        print(f"  {a}: {cnt} messages ({urg} urgent)")
+
+print()
+print("--- Shared Memory ---")
+active = [e for e in mem_entries if not e.get("deleted")]
+print(f"  {len(active)} active entries")
+for entry in active[-3:]:
+    k = entry.get("key", "")
+    f = entry.get("from", "")
+    t = entry.get("tags", [])
+    print(f"  {k:40s} | from: {f:10s} | tags: {t}")
+
+print()
+print("--- Recent Notifications ---")
+if recent_notifs:
+    for n in recent_notifs:
+        frm = n.get("from", "?")
+        to = n.get("notified_agent", "?")
+        typ = n.get("type", "")
+        ts = n.get("timestamp", "")[:16]
+        print(f"  {frm:>6} -> {to:<10s} | {typ:20s} | {ts}")
+else:
+    print("  (none)")
+'
 }
 
 if [[ $FOLLOW -eq 1 ]]; then
