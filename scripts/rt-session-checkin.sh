@@ -29,17 +29,36 @@ PENDING=0
 URGENT=0
 URGENT_MSGS=""
 if [[ -d "$INBOX_DIR" ]]; then
-  for f in "$INBOX_DIR"/*.json; do
-    [[ ! -f "$f" ]] && continue
-    PENDING=$((PENDING+1))
-    prio=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("priority",""))' "$f" 2>/dev/null)
-    if [[ "$prio" == "high" || "$prio" == "urgent" ]]; then
-      URGENT=$((URGENT+1))
-      FROM=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["from"])' "$f" 2>/dev/null)
-      TYPE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["type"])' "$f" 2>/dev/null)
-      URGENT_MSGS="$URGENT_MSGS\n  FROM: $FROM  TYPE: $TYPE"
+  shopt -s nullglob
+  files=("$INBOX_DIR"/*.json)
+  shopt -u nullglob
+  PENDING=${#files[@]}
+  if [[ $PENDING -gt 0 ]]; then
+    python_out=$(python3 -c '
+import json, sys
+urgent = 0
+urgent_msgs = []
+for path in sys.argv[1:]:
+    try:
+        with open(path) as f:
+            d = json.load(f)
+            prio = d.get("priority", "")
+            if prio in ("high", "urgent"):
+                urgent += 1
+                urgent_msgs.append("  FROM: {}  TYPE: {}".format(d.get("from", "?"), d.get("type", "?")))
+    except Exception:
+        pass
+print(urgent)
+for msg in urgent_msgs:
+    print(msg)
+' "${files[@]}")
+    URGENT=$(echo "$python_out" | head -n 1)
+    if [[ "$URGENT" -gt 0 ]]; then
+      # Format urgent messages with leading newline to match original output
+      URGENT_LINES=$(echo "$python_out" | tail -n +2)
+      URGENT_MSGS=$(printf "\n%s" "$URGENT_LINES")
     fi
-  done
+  fi
 fi
 
 # Save state (atomic write: temp file then mv to prevent race conditions)
