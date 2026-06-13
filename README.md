@@ -41,9 +41,57 @@ scripts/rt-status.sh merlin --task "Researching" --status working --progress "3/
 # Store shared knowledge
 scripts/rt-memory.sh set "key" "value" --from arthur --tags "tag1" --ttl 24
 
-# View dashboard
-open dashboard/dashboard.html
+# View text dashboard (works inside Hermes.app chat)
+scripts/rt-dashboard-text.sh
 ```
+
+## Hermes Desktop App Integration
+
+### Skill Bundles (Slash Commands)
+
+Install the skill bundles to invoke Round Table from any Hermes chat:
+
+```bash
+# Create /round-table bundle
+hermes bundles create round-table --skill round-table-protocol \
+  --description "Round Table multi-agent communication protocol" \
+  --instruction "You are part of the Round Table multi-agent system. Use rt-send.sh, rt-inbox.sh, rt-status.sh to communicate with other agents." \
+  --force
+
+# Create /dev-loop bundle
+hermes bundles create dev-loop --skill round-table-dev-loop \
+  --description "Round Table development loop" \
+  --instruction "Run multi-agent dev cycles with rt-devloop.sh" --force
+```
+
+Then type `/round-table` or `/dev-loop` in the Hermes desktop app chat.
+
+### Dashboard in Hermes.app
+
+**Text dashboard** (posts directly into chat):
+```bash
+~/.hermes/profiles/<agent>/skills/round-table-protocol/scripts/rt-dashboard-text.sh
+```
+
+**HTML dashboard** (view in Hermes preview rail):
+```bash
+# Start the dashboard server
+~/.hermes/profiles/<agent>/skills/round-table-protocol/scripts/ensure-dashboard.sh
+```
+Then open **http://localhost:8101/dashboard.html** in the Hermes desktop app's preview rail or browser tab. The dashboard refreshes every 5 seconds.
+
+### Agent Dispatch
+
+Messages become real work via `rt-dispatch.sh`: for every agent with unread inbox messages it launches an actual Hermes session under that agent's own profile (`hermes -p merlin -z …`), so each knight runs with its own SOUL.md, skills, and configured model.
+
+```bash
+scripts/rt-dispatch.sh once          # one pass over all inboxes
+scripts/rt-dispatch.sh once merlin   # dispatch one agent
+scripts/rt-dispatch.sh start         # background polling daemon (30s)
+scripts/rt-dispatch.sh status        # daemon state + unread counts
+```
+
+Failed deliveries retry up to 3 sessions, then park in `inbox/<agent>/failed/`. Per-agent locks prevent double-spawning.
 
 ## Scripts
 
@@ -65,24 +113,6 @@ open dashboard/dashboard.html
 | `rt-devloop.sh` | Dev loop: each phase runs as a real knight profile session (plan→arthur, research→merlin, build→percival, write→bedivere, qa→lancelot) |
 | `ensure-dashboard.sh` | Keep dashboard HTTP server running + data fresh |
 | `generate-dashboard-data.sh` | Regenerate dashboard JSON data |
-
-## Real agents, not subagents
-
-Messages become real work via `rt-dispatch.sh`: for every agent with unread
-inbox messages it launches an actual Hermes session under that agent's own
-profile (`hermes -p merlin -z …`), so each knight runs with its own SOUL.md,
-skills and configured model. The spawned agent reads, acts, replies via
-`rt-send.sh`, acks, and updates its status card.
-
-```bash
-scripts/rt-dispatch.sh once          # one pass over all inboxes
-scripts/rt-dispatch.sh start         # background polling daemon (30s)
-scripts/rt-dispatch.sh status        # daemon state + unread counts
-```
-
-Failed deliveries retry up to 3 sessions, then park in `inbox/<agent>/failed/`.
-Per-agent locks prevent double-spawning. `HERMES_BIN` env overrides the binary
-(used by tests to stub model calls).
 
 ## Dashboard
 
