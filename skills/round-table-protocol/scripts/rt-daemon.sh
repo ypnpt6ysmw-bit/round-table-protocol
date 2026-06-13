@@ -7,20 +7,19 @@
 # Falls back to polling if no file watcher is available.
 set -euo pipefail
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/rt-common.sh"
+
 PIDFILE="$ROUND_TABLE_DIR/.daemon.pid"
 NOTIFICATIONS="$ROUND_TABLE_DIR/notifications.jsonl"
 LOGFILE="$ROUND_TABLE_DIR/.daemon.log"
-CONFIG="$ROUND_TABLE_DIR/config.json"
 
 mkdir -p "$ROUND_TABLE_DIR"
 touch "$NOTIFICATIONS"
 
-get_agents() {
-  python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['agents']))" "$CONFIG" 2>/dev/null \
-    || echo "arthur merlin percival bedivere lancelot"
-}
-
+# log() and get_agents() are inherited from rt-common.sh
+# Note: rt-common.sh uses 'rt_log' to avoid conflict with macOS 'log' command
+# Redefine log() as alias for daemon-specific logging
 log() {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >> "$LOGFILE"
 }

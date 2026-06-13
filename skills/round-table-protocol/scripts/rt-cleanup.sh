@@ -59,7 +59,7 @@ file_age_secs() {
 
 is_old() {
   [[ -z "$OLDER_THAN" ]] && return 1
-  local age
+  age
   age=$(file_age_secs "$1")
   [[ $age -gt $((OLDER_THAN * 3600)) ]]
 }
@@ -186,6 +186,50 @@ if [[ -f "$NOTIF_FILE" ]]; then
 else
   echo "  (no notifications file)"
 fi
+
+# 5. Clean up dispatch logs and stale lock files
+echo ""
+echo "--- Dispatch Cleanup ---"
+DISPATCH_DIR="$ROUND_TABLE_DIR/.dispatch"
+DISPATCH_LOG_MAX_LINES=5000
+if [[ -f "$DISPATCH_DIR/dispatch.log" ]]; then
+  DISPATCH_LOG_LINES=$(wc -l < "$DISPATCH_DIR/dispatch.log" 2>/dev/null | tr -d ' ' || echo 0)
+  if [[ "$DISPATCH_LOG_LINES" -gt "$DISPATCH_LOG_MAX_LINES" ]]; then
+    if [[ $DRY_RUN -eq 0 ]]; then
+      tmp=$(mktemp "$DISPATCH_DIR/.dispatch.log.tmp.XXXXXX")
+      tail -n "$DISPATCH_LOG_MAX_LINES" "$DISPATCH_DIR/dispatch.log" > "$tmp"
+      mv "$tmp" "$DISPATCH_DIR/dispatch.log"
+    fi
+    echo "  Dispatch log: trimmed to $DISPATCH_LOG_MAX_LINES lines (was $DISPATCH_LOG_LINES)"
+  else
+    echo "  Dispatch log: $DISPATCH_LOG_LINES lines (under limit)"
+  fi
+fi
+# Remove stale lock files (owner process gone)
+if [[ -d "$DISPATCH_DIR" ]]; then
+  lock_pid=""
+  for lock in "$DISPATCH_DIR"/*.lock; do
+    [[ ! -d "$lock" ]] && continue
+    lock_pid=$(cat "$lock/pid" 2>/dev/null || true)
+    if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
+      [[ $DRY_RUN -eq 0 ]] && rm -rf "$lock"
+      echo "  Removed stale lock: $(basename "$lock") (pid $lock_pid)"
+    fi
+  done
+fi
+# Clean up agent dispatch logs older than retention period
+if [[ -d "$DISPATCH_DIR" ]]; then
+  shopt -s nullglob
+  for agent_log in "$DISPATCH_DIR"/[a-z]*.log; do
+    [[ "$(basename "$agent_log")" == "dispatch.log" ]] && continue
+    if is_old "$agent_log"; then
+      [[ $DRY_RUN -eq 0 ]] && rm "$agent_log"
+      echo "  Removed old agent log: $(basename "$agent_log")"
+    fi
+  done
+  shopt -u nullglob
+fi
+
 echo ""
 echo "--- Memory Vacuum ---"
 MEM_FILE="$ROUND_TABLE_DIR/memory.jsonl"

@@ -5,21 +5,27 @@
 set -euo pipefail
 
 AGENT="${1:?Usage: rt-session-checkin.sh <agent>}"
-RT_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
+RT_DIR="${ROUND_TABLE_DIR:-$(eval echo ~"$(whoami)")/.hermes/round-table}"
 INBOX_DIR="$RT_DIR/inbox/$AGENT"
 STATE_FILE="$RT_DIR/.checkin-state-${AGENT}"
 
-# Read last known message count
+# Read last known message count from state file
+# State file format: "timestamp\ncount\n" (two lines)
 LAST_COUNT=0
 if [[ -f "$STATE_FILE" ]]; then
-  SAVED_TIME=$(head -1 "$STATE_FILE" 2>/dev/null || echo "")
-  SAVED_COUNT=$(tail -1 "$STATE_FILE" 2>/dev/null || echo "0")
-  # Only reuse state if less than 30 min old
-  if [[ -n "$SAVED_TIME" ]]; then
-    NOW=$(date +%s)
-    AGE=$(( NOW - SAVED_TIME ))
-    if [[ $AGE -lt 1800 ]]; then
-      LAST_COUNT=$SAVED_COUNT
+  # Read both lines atomically
+  state_content=$(cat "$STATE_FILE" 2>/dev/null || echo "")
+  if [[ -n "$state_content" ]]; then
+    # Extract first line (timestamp) and second line (count)
+    saved_time=$(echo "$state_content" | sed -n '1p')
+    saved_count=$(echo "$state_content" | sed -n '2p')
+    # Only reuse state if less than 30 min old and both values present
+    if [[ -n "$saved_time" && -n "$saved_count" ]]; then
+      now=$(date +%s)
+      age=$(( now - saved_time ))
+      if [[ $age -lt 1800 ]]; then
+        LAST_COUNT=$saved_count
+      fi
     fi
   fi
 fi

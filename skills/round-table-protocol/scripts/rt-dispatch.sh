@@ -19,11 +19,9 @@
 #   RT_DISPATCH_TIMEOUT  seconds per agent session (default 600)
 set -euo pipefail
 
-# Resolve real user home (Hermes profile may override $HOME)
-_REAL_USER_HOME="$(eval echo ~"$(whoami)")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/rt-common.sh"
 
-ROUND_TABLE_DIR="${ROUND_TABLE_DIR:-$HOME/.hermes/round-table}"
-CONFIG="$ROUND_TABLE_DIR/config.json"
 HERMES_BIN="${HERMES_BIN:-hermes}"
 DISPATCH_DIR="$ROUND_TABLE_DIR/.dispatch"
 PIDFILE="$DISPATCH_DIR/.dispatcher.pid"
@@ -31,15 +29,11 @@ ATTEMPTS_FILE="$DISPATCH_DIR/attempts.json"
 TIMEOUT_SECS="${RT_DISPATCH_TIMEOUT:-600}"
 MAX_ATTEMPTS=3
 POLL_INTERVAL=30
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 mkdir -p "$DISPATCH_DIR"
 
-get_agents() {
-  python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['agents']))" "$CONFIG" 2>/dev/null \
-    || echo "arthur merlin percival bedivere lancelot"
-}
-
+# get_agents() is inherited from rt-common.sh
+# log() is inherited from rt-common.sh — but dispatch uses its own log file
 log() {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >> "$DISPATCH_DIR/dispatch.log"
 }
@@ -198,8 +192,9 @@ dispatch_agent() {  # dispatch_agent <agent> -> spawn real profile session
     return 0
   fi
 
-  if [[ ! -d "$_REAL_USER_HOME/.hermes/profiles/$agent" ]]; then
-    log "$agent: ERROR no Hermes profile at $_REAL_USER_HOME/.hermes/profiles/$agent"
+  local _real_home="$(eval echo ~"$(whoami)")"
+  if [[ ! -d "$_real_home/.hermes/profiles/$agent" ]]; then
+    log "$agent: ERROR no Hermes profile at $_real_home/.hermes/profiles/$agent"
     return 1
   fi
 

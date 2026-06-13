@@ -432,6 +432,64 @@ else
 fi
 unset HERMES_BIN
 
+### rt-retry: retry parked messages #######################################
+run "retry: no parked messages is no-op" 0 "$SCRIPTS/rt-retry.sh" 2>/dev/null
+# Park a message by exhausting attempts
+PARK_AGENT="merlin"
+PARK_MSG="park-test-$$"
+mkdir -p "$ROUND_TABLE_DIR/inbox/$PARK_AGENT"
+echo '{"id":"'"$PARK_MSG"'","from":"arthur","to":"'"$PARK_AGENT"'","type":"status","priority":"normal","timestamp":"2025-01-01T00:00:00Z","payload":{}}' > "$ROUND_TABLE_DIR/inbox/$PARK_AGENT/${PARK_MSG}.json"
+# Exhaust attempts
+echo '{"'"$PARK_MSG"'": 3}' > "$ROUND_TABLE_DIR/.dispatch/attempts.json"
+run "retry: parks exhausted message" 0 "$SCRIPTS/rt-dispatch.sh" once "$PARK_AGENT"
+assert_file "retry: message parked in failed" "$ROUND_TABLE_DIR/inbox/$PARK_AGENT/failed/${PARK_MSG}.json"
+# Now retry
+run "retry: retry parked message" 0 "$SCRIPTS/rt-retry.sh"
+assert_file "retry: message back in inbox" "$ROUND_TABLE_DIR/inbox/$PARK_AGENT/${PARK_MSG}.json"
+assert_not_contains "retry: attempt count reset" "attempts"
+
+### daemon notification delivery ############################################
+NOTIF_SANDBOX=$(mktemp -d "${TMPDIR:-/tmp}/rtp_notif.XXXXXX")
+export NOTIF_RT_DIR="$NOTIF_SANDBOX/rt"
+mkdir -p "$NOTIF_RT_DIR"
+cp "$REPO_DIR/config.json" "$NOTIF_RT_DIR/config.json"
+run "daemon: notification on message delivery" 0 bash -c '
+  ROUND_TABLE_DIR="'"$NOTIF_RT_DIR"'" bash scripts/rt-daemon.sh start >/dev/null 2>&1
+  sleep 3
+  ROUND_TABLE_DIR="'"$NOTIF_RT_DIR"'" bash scripts/rt-send.sh --from arthur --to merlin --type status --payload "{\"s\":\"notif-test\"}" >/dev/null 2>&1
+  sleep 2
+  cat "'"$NOTIF_RT_DIR"'/notifications.jsonl" 2>/dev/null | head -1
+  ROUND_TABLE_DIR="'"$NOTIF_RT_DIR"'" bash scripts/rt-daemon.sh stop >/dev/null 2>&1
+'
+assert_contains "daemon: notification contains from" "arthur"
+assert_contains "daemon: notification contains type" "status"
+rm -rf "$NOTIF_SANDBOX"
+
+### session-checkin state expiry ############################################
+SESS_AGENT="arthur"
+# Clean up any leftover messages from earlier tests
+rm -f "$ROUND_TABLE_DIR/inbox/$SESS_AGENT/"*.json 2>/dev/null || true
+rm -f "$ROUND_TABLE_DIR/.checkin-state-$SESS_AGENT" 2>/dev/null
+# Send a message
+"$SCRIPTS/rt-send.sh" --from merlin --to "$SESS_AGENT" --type status --payload '{"s":"ok"}' >/dev/null
+# First checkin should show pending
+run "session-checkin: first run shows pending" 0 "$SCRIPTS/rt-session-checkin.sh" "$SESS_AGENT"
+assert_contains "session-checkin: shows 1 pending" "1 pending"
+# Immediate re-run should be silent (state cached)
+run "session-checkin: immediate re-run silent" 0 "$SCRIPTS/rt-session-checkin.sh" "$SESS_AGENT"
+assert_not_contains "session-checkin: no duplicate output" "pending"
+# Manually expire the state file (set timestamp to 31 min ago)
+STATE_FILE="$ROUND_TABLE_DIR/.checkin-state-$SESS_AGENT"
+if [[ -f "$STATE_FILE" ]]; then
+  OLD_TS=$(( $(date +%s) - 1860 ))
+  echo "$OLD_TS" > "$STATE_FILE"
+  echo "0" >> "$STATE_FILE"
+  # Now checkin should show pending again (state expired)
+  "$SCRIPTS/rt-send.sh" --from merlin --to "$SESS_AGENT" --type status --payload '{"s":"ok2"}' >/dev/null
+  run "session-checkin: expired state re-shows" 0 "$SCRIPTS/rt-session-checkin.sh" "$SESS_AGENT"
+  assert_contains "session-checkin: expired shows pending" "2 pending"
+fi
+
 ### parity: scripts/ vs skills copy #######################################
 PARITY_OK=1
 for f in "$SCRIPTS"/rt-*.sh; do

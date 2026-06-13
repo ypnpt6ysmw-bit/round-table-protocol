@@ -1,66 +1,29 @@
 {
   "version": "2.0",
   "project_path": "/Users/arielkurek/Desktop/Ari/round-table-protocol",
-  "task": "Full pipeline dev loop: analyze, research, plan, fix, test, and improve the Round Table Protocol for seamless Hermes.app integration. Highest effort.",
+  "task": "Cycle 2: deep improvements — new tests, common library, cleanup, edge cases",
   "options": {
     "max_cycles": 3,
     "converge_after": 2,
     "max_minutes": 120,
     "max_issues_per_cycle": 5,
-    "auto": true,
-    "no_verify": false,
-    "no_doc": false,
-    "surgical_mode": false,
-    "review_only": false
+    "auto": true
   },
   "budget": {
-    "cycles_used": 1,
-    "subagent_runs": 1,
-    "wall_minutes": 25,
-    "started_at": "2026-06-13T20:20:00+00:00"
+    "cycles_used": 0,
+    "subagent_runs": 0,
+    "wall_minutes": 0,
+    "started_at": "2026-06-13T21:30:00+00:00"
   },
-  "current_cycle": 2,
+  "current_cycle": 1,
   "converged": false,
   "done": false,
   "consecutive_no_progress": 0,
-  "git_branch": "rt-loop/2026-06-13-full-pipeline",
-  "all_issues": [
-    {"id": "1", "title": "rt-devloop.sh missing CONFIG variable", "severity": "high", "category": "bug", "file": "scripts/rt-devloop.sh", "status": "resolved"},
-    {"id": "2", "title": "handle_rejects wrong outbox path", "severity": "high", "category": "bug", "file": "scripts/rt-dispatch.sh", "status": "resolved"},
-    {"id": "3", "title": "ensure-dashboard.sh dashboard.html path", "severity": "medium", "category": "bug", "file": "scripts/ensure-dashboard.sh", "status": "resolved"},
-    {"id": "4", "title": "rt-dashboard-text.sh wrong path", "severity": "medium", "category": "bug", "file": "scripts/rt-dashboard-text.sh", "status": "resolved"},
-    {"id": "5", "title": "rt-daemon.sh fswatch not detected", "severity": "medium", "category": "bug", "file": "scripts/rt-daemon.sh", "status": "resolved"},
-    {"id": "6", "title": "reply_to unused in handle_rejects", "severity": "low", "category": "quality", "file": "scripts/rt-dispatch.sh", "status": "resolved"},
-    {"id": "7", "title": "populate-demo.sh stale status cards", "severity": "low", "category": "bug", "file": "scripts/populate-demo.sh", "status": "resolved"},
-    {"id": "8", "title": "$HOME fallback missing in 10 scripts", "severity": "medium", "category": "bug", "file": "scripts/*.sh", "status": "resolved"},
-    {"id": "9", "title": "rt-dashboard-refresh.sh not executable", "severity": "low", "category": "permissions", "file": "scripts/rt-dashboard-refresh.sh", "status": "resolved"}
-  ],
-  "resolved_issues": ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  "git_branch": "rt-loop/2026-06-13-cycle-2",
+  "all_issues": [],
+  "resolved_issues": [],
   "reappearing_issues": [],
-  "cycle_results": [
-    {
-      "cycle": 1,
-      "issues_found": 9,
-      "issues_resolved": 9,
-      "tests_pass": 133,
-      "tests_fail": 0,
-      "notes": "Full pipeline audit complete. All scripts fixed, synced, and verified."
-    }
-  ],
-  "changelog": [
-    "Fix $HOME fallback in 10 scripts (use _REAL_USER_HOME)",
-    "Fix handle_rejects() outbox path (use sender's outbox via reply_to)",
-    "Fix rt-devloop.sh missing CONFIG= variable",
-    "Fix ensure-dashboard.sh dashboard.html multi-location search",
-    "Fix rt-dashboard-text.sh generate-dashboard-data.sh path",
-    "Fix rt-daemon.sh fswatch PATH extension for Homebrew",
-    "Fix populate-demo.sh $HOME fallback",
-    "Fix generate-dashboard-data.sh $HOME fallback",
-    "Fix rt-dashboard-refresh.sh executable permission",
-    "Add task-reject protocol to SKILL.md",
-    "Add roles registry to config.json"
-  ],
-  "errors": [
-    "LANCELOT dispatch timed out (600s) — audit task too complex for single dispatch"
-  ]
+  "cycle_results": [],
+  "changelog": [],
+  "errors": []
 }
